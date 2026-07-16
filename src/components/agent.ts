@@ -1,0 +1,164 @@
+import type { Component } from "@oh-my-pi/pi-tui"
+import { visibleWidth } from "@oh-my-pi/pi-tui"
+import { EMPTY_AGENT_SESSION, renderAgentBody } from "../agent-body"
+import type { AgentSessionView } from "../agent-controller"
+import { ANSI } from "../colors"
+import type { CommandPromptView } from "../command-prompt"
+import { fitLine } from "../width"
+import { renderFramedPanel } from "./framed-panel"
+
+const FOCUS_STOCK = "600519 贵州茅台"
+const DEFAULT_HEIGHT = 15
+
+function alignSides(left: string, right: string, width: number): string {
+  const gap = width - visibleWidth(left) - visibleWidth(right)
+  if (gap < 1) return fitLine(left, width)
+  return `${left}${" ".repeat(gap)}${right}`
+}
+
+function agentInputLine(input: string, cursor: string, right: string, width: number): string {
+  const prompt = `${ANSI.cyan}>_${ANSI.reset} `
+  const left = `${prompt}${input}${cursor}`
+  if (visibleWidth(left) + visibleWidth(right) < width) return alignSides(left, right, width)
+  const inputWidth = Math.max(0, width - visibleWidth(prompt) - visibleWidth(cursor))
+  return `${prompt}${fitLine(input, inputWidth)}${cursor}`
+}
+
+function agentStatusLabel(status: AgentSessionView["status"]): string {
+  if (status === "unconfigured") return "未配置"
+  if (status === "streaming") return "分析中"
+  if (status === "tool-running") return "工具调用"
+  if (status === "completed") return "已完成"
+  if (status === "error") return "错误"
+  return "就绪"
+}
+
+export class AgentWorkspace implements Component {
+  readonly #input: string
+  readonly #agentView: AgentSessionView
+  readonly #active: boolean
+  readonly #commandView: CommandPromptView | undefined
+  readonly #scrollOffset: number
+
+  constructor(
+    input: string,
+    active = true,
+    commandView?: CommandPromptView,
+    agentView: AgentSessionView = EMPTY_AGENT_SESSION,
+    scrollOffset = 0,
+  ) {
+    this.#input = input
+    this.#active = active
+    this.#commandView = commandView
+    this.#agentView = agentView
+    this.#scrollOffset = Number.isFinite(scrollOffset) ? Math.max(0, Math.trunc(scrollOffset)) : 0
+  }
+
+  render(width: number): readonly string[] {
+    return this.renderAtHeight(width, DEFAULT_HEIGHT)
+  }
+
+  renderAtHeight(width: number, height: number): readonly string[] {
+    const safeWidth = Math.max(0, width | 0)
+    const safeHeight = Math.max(0, height | 0)
+    const inputCursor = this.#active ? `${ANSI.reverse} ${ANSI.reset}` : ""
+    if (safeHeight === 0) return []
+    if (safeHeight < 3 || safeWidth < 5) {
+      const compact = [
+        `Agent / ${FOCUS_STOCK}`,
+        agentInputLine(this.#input, inputCursor, "", safeWidth),
+      ]
+      return Array.from({ length: safeHeight }, (_, index) =>
+        fitLine(compact[index] ?? "", safeWidth),
+      )
+    }
+
+    const contentHeight = safeHeight - 2
+    const contentWidth = Math.max(1, safeWidth - 4)
+    const bodyCapacity = Math.max(0, contentHeight - 3)
+    const paletteOpen = this.#commandView?.isPaletteOpen === true
+    const statusColor = this.#active ? ANSI.cyan : ANSI.brightBlack
+    let status = `${statusColor}● 就绪${ANSI.reset}`
+    if (paletteOpen) {
+      status = `${statusColor}● 命令${ANSI.reset}`
+    } else if (this.#commandView?.result !== null && this.#commandView?.result !== undefined) {
+      const label = this.#commandView.result.title === "命令执行中" ? "执行中" : "已执行"
+      status = `${statusColor}● ${label}${ANSI.reset}`
+    } else {
+      const label = agentStatusLabel(this.#agentView.status)
+      status = `${statusColor}● ${label}${ANSI.reset}`
+    }
+    const focusMarker = this.#active ? "◆ " : ""
+    const title = alignSides(
+      `${focusMarker}Agent / 上下文 ${FOCUS_STOCK}`,
+      status,
+      Math.max(0, safeWidth - 5),
+    )
+    const lines: string[] = [
+      `${ANSI.brightBlack}会话 1 · 模型 ${this.#agentView.modelLabel} · 上下文 行情 + 持仓 + 财经新闻${ANSI.reset}`,
+    ]
+
+    const body = this.#activeBody(bodyCapacity, contentWidth)
+    const maxScrollOffset = Math.max(0, body.length - bodyCapacity)
+    const scrollOffset = paletteOpen ? 0 : Math.min(this.#scrollOffset, maxScrollOffset)
+    const bodyStart = Math.max(0, body.length - bodyCapacity - scrollOffset)
+    const bodyPadding = paletteOpen ? Math.max(0, bodyCapacity - body.length) : 0
+    for (let index = 0; index < bodyCapacity; index++) {
+      lines.push(index < bodyPadding ? "" : (body[bodyStart + index - bodyPadding] ?? ""))
+    }
+
+    lines.push(
+      paletteOpen
+        ? `${ANSI.brightBlack}↑↓ 选择 · Tab 补全 · Esc 关闭${ANSI.reset}`
+        : body.length > bodyCapacity
+          ? `${ANSI.brightBlack}↑↓ 滚动 · PgUp/PgDn 翻页 · Home/End 首尾${ANSI.reset}`
+          : `${ANSI.brightBlack}${"─".repeat(contentWidth)}${ANSI.reset}`,
+    )
+    lines.push(
+      agentInputLine(
+        this.#input,
+        inputCursor,
+        paletteOpen ? "" : `${ANSI.brightBlack}Enter 发送${ANSI.reset}`,
+        contentWidth,
+      ),
+    )
+
+    return renderFramedPanel(title, lines, safeWidth, safeHeight, this.#active ? "accent" : "muted")
+  }
+
+  #activeBody(capacity: number, width: number): readonly string[] {
+    const commandView = this.#commandView
+    if (commandView?.isPaletteOpen === true) {
+      const lines = [`${ANSI.brightWhite}Command${ANSI.reset} · 命令列表`]
+      if (commandView.suggestions.length === 0) {
+        lines.push(`${ANSI.brightBlack}没有匹配命令 · 输入 /help 查看帮助${ANSI.reset}`)
+        return lines
+      }
+      const visibleCount = Math.max(0, capacity - 1)
+      if (visibleCount === 0) return lines
+      const start = Math.min(
+        Math.max(0, commandView.suggestions.length - visibleCount),
+        Math.max(0, commandView.selectedIndex - visibleCount + 1),
+      )
+      const end = Math.min(commandView.suggestions.length, start + visibleCount)
+      for (let index = start; index < end; index++) {
+        const command = commandView.suggestions[index]
+        if (command === undefined) continue
+        const marker = index === commandView.selectedIndex ? "›" : " "
+        let line = `${marker} ${command.usage}  ${command.description}`
+        if (index === commandView.selectedIndex) {
+          line = `${ANSI.cyan}${ANSI.reverse}${line}${ANSI.reset}`
+        }
+        lines.push(line)
+      }
+      return lines
+    }
+    if (commandView?.result !== null && commandView?.result !== undefined) {
+      return [
+        `${ANSI.brightWhite}Command${ANSI.reset} · ${commandView.result.title}`,
+        ...commandView.result.lines,
+      ]
+    }
+    return renderAgentBody(this.#agentView, width)
+  }
+}

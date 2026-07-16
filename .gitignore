@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.omo/evidence/
+.omo/run-continuation/
+
+.env

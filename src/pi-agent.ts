@@ -1,0 +1,188 @@
+import { Agent, type AgentEvent } from "@oh-my-pi/pi-agent-core"
+import { getEnvApiKey, getEnvApiKeyName } from "@oh-my-pi/pi-ai"
+import { type GeneratedProvider, getBundledModel } from "@oh-my-pi/pi-catalog"
+import { AgentController, type AgentDriver, type AgentDriverEvent } from "./agent-controller"
+import { createAStockAgentTools } from "./agent-tools"
+import type { CommandContext } from "./commands"
+
+const SYSTEM_PROMPT = [
+  "你是 AStockTUI 内置的中文 A 股分析与模拟交易 Agent。所有资金、持仓和成交都属于本地模拟账户，绝不是真实券商订单。",
+  "个股分析使用自选行情；大盘、市场情绪、风格或板块分析必须调用 get_market_overview；事件分析调用 get_financial_news，并按需先刷新。必须检查 availability 和 errors，禁止把缺失数据当成零值或编造价格、新闻、仓位及工具结果。",
+  "你可以操作行情刷新、自选股、工作区、交易预览、模拟买卖和模拟账户重置。所有操作必须复用工具，不得声称执行了未调用工具的动作。",
+  "只有当用户明确给出买卖指令，或明确授权你在当前请求中自主模拟交易时，才可调用 execute_trade。执行前应先调用 preview_trade 检查费用、资金、整手和 T+1 风险。",
+  "reset_paper_account 只有在用户明确要求重置全部模拟资产时才能调用。不得操作 shell、文件系统、真实券商或任何项目外接口。",
+  "回答应给出依据、风险和已执行动作；区分事实、推断与模拟操作，不承诺收益。A 股界面约定红涨绿跌。",
+]
+
+export interface PiAgentConfig {
+  readonly provider?: string
+  readonly model?: string
+  readonly apiKey?: string
+  readonly baseUrl?: string
+}
+
+class PiAgentDriver implements AgentDriver {
+  readonly #agent: Agent
+  readonly #labels: ReadonlyMap<string, string>
+  #emit: ((event: AgentDriverEvent) => void) | null = null
+  #currentInput = ""
+
+  constructor(agent: Agent, labels: ReadonlyMap<string, string>) {
+    this.#agent = agent
+    this.#labels = labels
+    this.#agent.subscribe((event) => this.#handleEvent(event))
+    this.#agent.beforeToolCall = ({ toolCall }) =>
+      authorizeAgentTool(toolCall.name, this.#currentInput)
+        ? undefined
+        : { block: true, reason: "用户未明确授权当前请求执行该模拟账户操作" }
+  }
+
+  async run(input: string, emit: (event: AgentDriverEvent) => void): Promise<void> {
+    this.#emit = emit
+    this.#currentInput = input
+    try {
+      await this.#agent.prompt(input)
+    } finally {
+      this.#emit = null
+      this.#currentInput = ""
+    }
+  }
+
+  clear(): void {
+    this.#agent.clearMessages()
+  }
+
+  abort(): void {
+    this.#agent.abort()
+  }
+
+  #handleEvent(event: AgentEvent): void {
+    const emit = this.#emit
+    if (emit === null) return
+    if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
+      emit({ type: "text_delta", delta: event.assistantMessageEvent.delta })
+      return
+    }
+    if (event.type === "tool_execution_start") {
+      emit({
+        type: "tool_start",
+        id: event.toolCallId,
+        name: event.toolName,
+        label: this.#labels.get(event.toolName) ?? event.toolName,
+      })
+      return
+    }
+    if (event.type === "tool_execution_end") {
+      emit({
+        type: "tool_end",
+        id: event.toolCallId,
+        name: event.toolName,
+        label: this.#labels.get(event.toolName) ?? event.toolName,
+        summary: summarizeToolResult(event.result),
+        isError: event.isError === true,
+      })
+    }
+  }
+}
+
+class UnavailableAgentDriver implements AgentDriver {
+  async run(): Promise<void> {}
+  clear(): void {}
+  abort(): void {}
+}
+
+export function createPiAgentController(
+  context: CommandContext,
+  config: PiAgentConfig = {},
+): AgentController {
+  const provider = config.provider ?? configuredValue("ASTOCK_AGENT_PROVIDER") ?? "openai"
+  const modelId = config.model ?? configuredValue("ASTOCK_AGENT_MODEL") ?? "gpt-4o-mini"
+  const modelLabel = `${provider}/${modelId}`
+  const bundledModel = getBundledModel(provider as GeneratedProvider, modelId)
+  if (bundledModel === undefined) {
+    return new AgentController(
+      new UnavailableAgentDriver(),
+      modelLabel,
+      `Pi 模型不存在：${modelLabel}`,
+    )
+  }
+  const configuredBaseUrl =
+    config.baseUrl ??
+    configuredValue("ASTOCK_AGENT_BASE_URL") ??
+    (provider === "openai" ? configuredValue("OPENAI_BASE_URL") : undefined)
+  let model: typeof bundledModel
+  try {
+    model = withAgentBaseUrl(bundledModel, configuredBaseUrl)
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    return new AgentController(new UnavailableAgentDriver(), modelLabel, reason)
+  }
+
+  const apiKey = config.apiKey ?? getEnvApiKey(provider)
+  const apiKeyName = getEnvApiKeyName(provider)
+  const configurationError =
+    apiKeyName !== undefined && apiKey === undefined ? `未配置 ${apiKeyName}` : undefined
+  const configuredApiKey = config.apiKey
+  const tools = createAStockAgentTools(context)
+  const agent = new Agent({
+    initialState: {
+      systemPrompt: SYSTEM_PROMPT,
+      model,
+      tools: [...tools],
+    },
+    ...(configuredApiKey === undefined ? {} : { getApiKey: () => configuredApiKey }),
+    hideThinkingSummary: true,
+  })
+  const labels = new Map(tools.map((tool) => [tool.name, tool.label]))
+  return new AgentController(new PiAgentDriver(agent, labels), modelLabel, configurationError)
+}
+
+export function withAgentBaseUrl<TModel extends { readonly baseUrl: string }>(
+  model: TModel,
+  baseUrl: string | undefined,
+): TModel {
+  if (baseUrl === undefined) return model
+  let parsed: URL
+  try {
+    parsed = new URL(baseUrl.trim())
+  } catch {
+    throw new Error(`Agent Base URL 无效：${baseUrl}`)
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`Agent Base URL 仅支持 HTTP 或 HTTPS：${baseUrl}`)
+  }
+  const normalized = parsed.toString().replace(/\/+$/u, "")
+  return { ...model, baseUrl: normalized }
+}
+
+export function authorizeAgentTool(toolName: string, input: string): boolean {
+  if (toolName !== "execute_trade" && toolName !== "reset_paper_account") return true
+  const denied =
+    /(不要|禁止|仅分析|只分析|不交易|别交易|别买|别卖)|analysis\s+only|do\s+not\s+(?:trade|buy|sell)|don't\s+(?:trade|buy|sell)/iu
+  if (denied.test(input)) return false
+  if (toolName === "reset_paper_account") {
+    return /(重置.*账户|账户.*重置|清空.*账户|reset.*account)/iu.test(input)
+  }
+  return /(买入|买进|卖出|卖掉|清仓|下单|交易|调仓|自动操作|自动交易|自主操作|自主交易|帮我操作)|\b(?:buy|sell|trade|rebalance|automate|automatic)\b/iu.test(
+    input,
+  )
+}
+
+function configuredValue(name: string): string | undefined {
+  const value = Reflect.get(Bun.env, name)
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined
+}
+
+function summarizeToolResult(result: unknown): string {
+  if (typeof result !== "object" || result === null) return "工具调用完成"
+  const content = Reflect.get(result, "content")
+  if (!Array.isArray(content)) return "工具调用完成"
+  for (const item of content) {
+    if (typeof item !== "object" || item === null || Reflect.get(item, "type") !== "text") continue
+    const text = Reflect.get(item, "text")
+    if (typeof text !== "string") continue
+    const compact = text.replace(/\s+/gu, " ").trim()
+    if (compact.length > 0) return compact.length > 120 ? `${compact.slice(0, 117)}...` : compact
+  }
+  return "工具调用完成"
+}

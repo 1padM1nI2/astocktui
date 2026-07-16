@@ -1,0 +1,190 @@
+import { describe, expect, test } from "bun:test"
+import type { AgentTool } from "@oh-my-pi/pi-agent-core"
+import { createAStockAgentTools } from "../src/agent-tools"
+import type { CommandContext } from "../src/commands"
+import type { MarketSnapshot } from "../src/market-data"
+import type { MarketOverviewSnapshot } from "../src/market-overview"
+import type { FinancialNewsSnapshot } from "../src/news-data"
+import { PaperTradingService } from "../src/trading"
+
+const QUOTE = {
+  code: "SH600519",
+  name: "贵州茅台",
+  price: 100,
+  changePercent: 1,
+  source: "test-market",
+}
+
+async function runTool(
+  tools: readonly AgentTool[],
+  name: string,
+  params: Record<string, unknown> = {},
+): Promise<unknown> {
+  const tool = tools.find((candidate) => candidate.name === name)
+  if (tool === undefined) throw new Error(`工具不存在：${name}`)
+  const result = await tool.execute("test-call", params)
+  const text = result.content.find((item) => item.type === "text")?.text
+  return text === undefined ? null : JSON.parse(text)
+}
+
+function toolContext(): {
+  readonly context: CommandContext
+  readonly trading: PaperTradingService
+  readonly focused: string[]
+  readonly refreshed: string[]
+  readonly watchlist: string[]
+  portfolioChanges: number
+  resets: number
+} {
+  const trading = new PaperTradingService({ now: () => new Date("2026-07-16T02:00:00.000Z") })
+  const focused: string[] = []
+  const refreshed: string[] = []
+  const watchlist = ["SH600519"]
+  const market: MarketSnapshot = { quotes: [QUOTE], trend: [99, 100], source: "test-market" }
+  const overview: MarketOverviewSnapshot = {
+    indices: [],
+    breadth: {
+      rising: 3_000,
+      falling: 2_000,
+      flat: 100,
+      gainAtLeast10Percent: 50,
+      lossAtLeast10Percent: 10,
+      distribution: {},
+    },
+    sectors: { leaders: [], laggards: [], totalTurnover: 1_000_000_000_000 },
+    movers: { gainers: [], losers: [] },
+    source: "test-overview",
+    availability: { indices: false, breadth: true, sectors: true, movers: true, errors: [] },
+    updatedAt: 1_752_634_800_000,
+  }
+  const news: FinancialNewsSnapshot = {
+    items: [
+      { id: "1", title: "白酒板块午后走强", publishedAt: 1_752_634_800_000, source: "财联社" },
+      { id: "2", title: "银行板块震荡", publishedAt: 1_752_634_700_000, source: "华尔街见闻" },
+    ],
+    source: "test-news",
+  }
+  const state = {
+    context: undefined as unknown as CommandContext,
+    trading,
+    focused,
+    refreshed,
+    watchlist,
+    portfolioChanges: 0,
+    resets: 0,
+  }
+  state.context = {
+    focus: (workspace) => focused.push(workspace),
+    refresh: (target) => ({
+      market: target === "news" ? "skipped" : "started",
+      news: target === "market" ? "skipped" : "started",
+    }),
+    refreshAndWait: async (target) => {
+      refreshed.push(target)
+    },
+    quit: () => {},
+    clearAgent: () => {},
+    status: () => ({
+      activeWorkspace: "agent",
+      market: { state: "ready", source: market.source },
+      news: { state: "ready", source: news.source },
+      agent: "ready",
+    }),
+    marketSnapshot: () => market,
+    marketOverview: async () => overview,
+    newsSnapshot: () => news,
+    portfolio: () => trading.snapshot,
+    quote: async (code) => (code.endsWith("600519") ? QUOTE : undefined),
+    trading: () => trading,
+    portfolioChanged: () => {
+      state.portfolioChanges++
+    },
+    watchlist: () => [...watchlist],
+    changeWatchlist: async (action, code) => {
+      if (action === "add") watchlist.push(code)
+      else watchlist.splice(watchlist.indexOf(code), 1)
+      return { ok: true, code, message: action === "add" ? `已添加 ${code}` : `已删除 ${code}` }
+    },
+  }
+  return state
+}
+
+describe("AStock Pi Agent 工具", () => {
+  test("向 Agent 暴露全部行情、新闻、账户和控制接口", () => {
+    const tools = createAStockAgentTools(toolContext().context)
+    expect(tools.map((tool) => tool.name)).toEqual([
+      "get_app_status",
+      "get_market_snapshot",
+      "get_market_overview",
+      "get_financial_news",
+      "get_portfolio",
+      "get_trade_history",
+      "refresh_data",
+      "manage_watchlist",
+      "preview_trade",
+      "execute_trade",
+      "reset_paper_account",
+      "focus_workspace",
+    ])
+  })
+
+  test("读取工具返回实时行情、新闻、账户和成交记录", async () => {
+    const state = toolContext()
+    const tools = createAStockAgentTools(state.context)
+
+    expect(await runTool(tools, "get_app_status")).toMatchObject({ activeWorkspace: "agent" })
+    expect(await runTool(tools, "get_market_snapshot")).toMatchObject({ source: "test-market" })
+    expect(await runTool(tools, "get_market_overview")).toMatchObject({
+      source: "test-overview",
+      breadth: { rising: 3_000, falling: 2_000 },
+    })
+    expect(await runTool(tools, "get_financial_news", { query: "白酒", limit: 1 })).toMatchObject({
+      source: "test-news",
+      total: 1,
+      items: [{ title: "白酒板块午后走强" }],
+    })
+    expect(await runTool(tools, "get_portfolio")).toMatchObject({ cash: 100_000 })
+    expect(await runTool(tools, "get_trade_history")).toEqual([])
+  })
+
+  test("Agent 交易复用模拟账户风控并更新持仓", async () => {
+    const state = toolContext()
+    const tools = createAStockAgentTools(state.context)
+
+    const preview = await runTool(tools, "preview_trade", {
+      side: "buy",
+      code: "600519",
+      quantity: 100,
+    })
+    expect(preview).toMatchObject({ side: "buy", code: "SH600519", quantity: 100 })
+    expect(state.trading.trades).toHaveLength(0)
+
+    const executed = await runTool(tools, "execute_trade", {
+      side: "buy",
+      code: "600519",
+      quantity: 100,
+    })
+    expect(executed).toMatchObject({ ok: true, trade: { id: "SIM-0001" } })
+    expect(state.trading.snapshot.positions[0]?.quantity).toBe(100)
+    expect(state.portfolioChanges).toBe(1)
+  })
+
+  test("Agent 可以刷新、管理自选股、切换焦点并显式重置模拟账户", async () => {
+    const state = toolContext()
+    const tools = createAStockAgentTools(state.context)
+    state.trading.execute("buy", QUOTE, 100)
+
+    await runTool(tools, "refresh_data", { target: "all" })
+    await runTool(tools, "manage_watchlist", { action: "add", code: "SZ000938" })
+    await runTool(tools, "focus_workspace", { workspace: "portfolio" })
+    await expect(runTool(tools, "reset_paper_account", { confirmation: "NO" })).rejects.toThrow(
+      "RESET",
+    )
+    await runTool(tools, "reset_paper_account", { confirmation: "RESET" })
+
+    expect(state.refreshed).toEqual(["all"])
+    expect(state.watchlist).toContain("SZ000938")
+    expect(state.focused).toEqual(["portfolio"])
+    expect(state.trading.snapshot.positions).toEqual([])
+  })
+})

@@ -1,0 +1,155 @@
+import type { Component } from "@oh-my-pi/pi-tui"
+import { ANSI } from "../colors"
+import type { MarketQuote, MarketSnapshot } from "../market-data"
+import { DEFAULT_WATCHLIST, DEFAULT_WATCHLIST_CODES } from "../market-data"
+import { alignCell, fitLine } from "../width"
+
+const DEFAULT_NAMES = new Map(DEFAULT_WATCHLIST.map((item) => [item.code, item.name]))
+
+function renderSparkline(prices: readonly number[], width: number): string {
+  if (width < 20 || prices.length < 2) return fitLine("走势 无数据", width)
+  const min = Math.min(...prices)
+  const max = Math.max(...prices)
+  const labelWidth = 20
+  const barSlots = Math.max(4, width - labelWidth)
+  const step = Math.max(1, Math.floor((prices.length - 1) / barSlots))
+  let bars = ""
+  for (let i = step; i < prices.length; i += step) {
+    const prev = prices[i - step] ?? prices[i - 1] ?? 0
+    const curr = prices[i] ?? prev
+    if (curr > prev) {
+      bars += `${ANSI.red}|`
+    } else if (curr < prev) {
+      bars += `${ANSI.green}|`
+    } else {
+      bars += "|"
+    }
+  }
+  bars += ANSI.reset
+  return fitLine(`走势 ${min.toFixed(2)} ${bars} ${max.toFixed(2)}`, width)
+}
+
+function trendColor(change: number): string {
+  if (change > 0) return ANSI.red
+  if (change < 0) return ANSI.green
+  return ""
+}
+
+const CODE_WIDTH = 6
+const NAME_WIDTH = 10
+const PRICE_WIDTH = 10
+const CHANGE_WIDTH = 9
+const TABLE_GAP = "  "
+
+function renderTableRow(
+  code: string,
+  name: string,
+  price: string,
+  change: string,
+  width: number,
+): string {
+  const row =
+    `${alignCell(code, CODE_WIDTH, "left")}${TABLE_GAP}` +
+    `${alignCell(name, NAME_WIDTH, "left")}${TABLE_GAP}` +
+    `${alignCell(price, PRICE_WIDTH, "right")}${TABLE_GAP}` +
+    alignCell(change, CHANGE_WIDTH, "right")
+  return fitLine(row, width)
+}
+
+export class MarketWorkspace implements Component {
+  #snapshot: MarketSnapshot | null = null
+  #status: "idle" | "loading" | "ready" | "error" = "idle"
+  #quotesByCode: Readonly<Record<string, MarketQuote>> = {}
+  #watchlistCodes: readonly string[]
+
+  constructor(codes: readonly string[] = DEFAULT_WATCHLIST_CODES) {
+    this.#watchlistCodes = [...codes]
+  }
+
+  setWatchlist(codes: readonly string[]): void {
+    this.#watchlistCodes = [...codes]
+  }
+  get status(): "idle" | "loading" | "ready" | "error" {
+    return this.#status
+  }
+
+  get source(): string | null {
+    return this.#snapshot?.source ?? null
+  }
+
+  get snapshot(): MarketSnapshot | null {
+    return this.#snapshot
+  }
+
+  findQuote(code: string): MarketQuote | undefined {
+    const normalized = code.trim().toUpperCase()
+    const direct = this.#quotesByCode[normalized]
+    if (direct !== undefined) return direct
+    for (const quote of Object.values(this.#quotesByCode)) {
+      if (quote.code.toUpperCase().endsWith(normalized)) return quote
+    }
+    return undefined
+  }
+
+  beginRefresh(): void {
+    this.#status = "loading"
+  }
+
+  applySnapshot(snapshot: MarketSnapshot): void {
+    this.#snapshot = snapshot
+    const quotesByCode: Record<string, MarketQuote> = {}
+    for (const quote of snapshot.quotes) quotesByCode[quote.code] = quote
+    this.#quotesByCode = quotesByCode
+    this.#status = "ready"
+  }
+
+  failRefresh(): void {
+    this.#status = "error"
+  }
+
+  render(width: number): readonly string[] {
+    const safeWidth = Math.max(0, width | 0)
+    let status = `${ANSI.brightBlack}[未加载 · R刷新]${ANSI.reset}`
+    if (this.#status === "loading") status = `${ANSI.yellow}[更新中]${ANSI.reset}`
+    else if (this.#status === "ready") {
+      status = `${ANSI.brightBlack}[数据源 ${this.#snapshot?.source ?? "stock-api"} · R刷新]${ANSI.reset}`
+    } else if (this.#status === "error") {
+      status = `${ANSI.brightRed}[获取失败 · R重试]${ANSI.reset}`
+    }
+
+    const lines: string[] = []
+    lines.push(fitLine(`行情 / 沪深A股 实时 ${status}`, safeWidth))
+    lines.push("─".repeat(safeWidth))
+    lines.push(renderSparkline(this.#snapshot?.trend ?? [], safeWidth))
+    lines.push(renderTableRow("代码", "名称", "现价", "涨跌幅", safeWidth))
+    for (const code of this.#watchlistCodes) {
+      const quote = this.#quotesByCode[code]
+      if (quote === undefined) {
+        lines.push(
+          renderTableRow(
+            code.slice(2),
+            DEFAULT_NAMES.get(code) ?? "等待行情",
+            "--",
+            "--",
+            safeWidth,
+          ),
+        )
+        continue
+      }
+
+      const sign = quote.changePercent > 0 ? "+" : ""
+      const color = trendColor(quote.changePercent)
+      const reset = color.length > 0 ? ANSI.reset : ""
+      lines.push(
+        renderTableRow(
+          quote.code.slice(2),
+          quote.name,
+          quote.price.toFixed(2),
+          `${color}${sign}${quote.changePercent.toFixed(2)}%${reset}`,
+          safeWidth,
+        ),
+      )
+    }
+    return lines
+  }
+}
