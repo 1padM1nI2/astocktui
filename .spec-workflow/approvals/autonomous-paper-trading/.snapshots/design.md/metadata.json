@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/autonomous-paper-trading/design.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-07-17T03:06:39.055Z",
+      "trigger": "initial",
+      "approvalId": "approval_1784257599052_y9s8pjsu4",
+      "approvalTitle": "自主模拟交易技术设计"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-07-17T03:13:33.146Z",
+      "trigger": "approved",
+      "approvalId": "approval_1784257599052_y9s8pjsu4",
+      "approvalTitle": "自主模拟交易技术设计"
+    }
+  ]
+}

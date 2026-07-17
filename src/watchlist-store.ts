@@ -1,5 +1,5 @@
 import { defaultAppDataPath, readJsonFile, writeJsonFileAtomically } from "./json-file"
-import { normalizeAshareCode } from "./market-data"
+import { normalizeMarketCode } from "./market-code"
 import { type WatchlistOptions, WatchlistService, type WatchlistState } from "./watchlist"
 
 export interface PersistentWatchlistOptions
@@ -54,7 +54,7 @@ function isWatchlistState(value: unknown): value is WatchlistState {
   if (!Array.isArray(codes) || codes.length === 0) return false
   const uniqueCodes = new Set<string>()
   for (const code of codes) {
-    if (typeof code !== "string" || normalizeAshareCode(code) !== code || uniqueCodes.has(code)) {
+    if (typeof code !== "string" || normalizeMarketCode(code) !== code || uniqueCodes.has(code)) {
       return false
     }
     uniqueCodes.add(code)

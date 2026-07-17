@@ -21,6 +21,11 @@ export class CommandPrompt {
   #result: CommandResult | null = null
   #pending: Promise<void> | null = null
   #executionVersion = 0
+  readonly #additionalCommands: () => readonly AppCommand[]
+
+  constructor(additionalCommands: () => readonly AppCommand[] = () => []) {
+    this.#additionalCommands = additionalCommands
+  }
   get isPaletteOpen(): boolean {
     return this.#input.startsWith("/")
   }
@@ -43,7 +48,7 @@ export class CommandPrompt {
       submitted: this.#submitted,
       result: this.#result,
       isPaletteOpen,
-      suggestions: isPaletteOpen ? filterCommands(this.#input) : [],
+      suggestions: isPaletteOpen ? filterCommands(this.#input, this.#additionalCommands()) : [],
       selectedIndex: this.#selectedIndex,
     }
   }
@@ -85,7 +90,7 @@ export class CommandPrompt {
     execute: (input: string) => CommandExecution,
     onUpdate: () => void,
   ): boolean {
-    const suggestions = filterCommands(this.#input)
+    const suggestions = filterCommands(this.#input, this.#additionalCommands())
     if (data === "\x1b") {
       this.#input = ""
       this.#selectedIndex = 0

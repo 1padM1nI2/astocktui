@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/global-market-data/design.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-07-17T01:11:37.374Z",
+      "trigger": "initial",
+      "approvalId": "approval_1784250697365_b6owy4bv6",
+      "approvalTitle": "全球市场数据技术设计"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-07-17T02:28:45.876Z",
+      "trigger": "approved",
+      "approvalId": "approval_1784250697365_b6owy4bv6",
+      "approvalTitle": "全球市场数据技术设计"
+    }
+  ]
+}

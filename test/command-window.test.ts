@@ -531,3 +531,47 @@ describe("Agent 命令窗口", () => {
     expect(frame).toContain("/quit | /exit")
   })
 })
+
+test("命令窗口将全球股票加入自选并在刷新后显示跨市场行", async () => {
+  let requested: readonly string[] = []
+  const source: MarketDataSource = {
+    async loadSnapshot(codes): Promise<MarketSnapshot> {
+      requested = [...codes]
+      return {
+        quotes: codes.map((code) =>
+          code === "US:AAPL"
+            ? {
+                code,
+                name: "Apple",
+                price: 210,
+                changePercent: 1.25,
+                source: "yahoo",
+                market: "US" as const,
+                currency: "USD",
+                marketState: "open" as const,
+              }
+            : { code, name: "A股", price: 100, changePercent: 0.5, source: "fixture" },
+        ),
+        trend: [99, 100],
+        source: "多源",
+      }
+    },
+  }
+  const app = new MarketIntelligenceApp(source, undefined, () => 16)
+  try {
+    focusAgent(app)
+    await enterCommand(app, "/watch add US:AAPL")
+    expect(app.render(79).join("\n")).toContain("US:AAPL")
+
+    await enterCommand(app, "/refresh market")
+    await Promise.resolve()
+    expect(requested).toContain("US:AAPL")
+    app.handleInput("\t")
+    const frame = app.render(79).map(stripVTControlCharacters).join("\n")
+    expect(frame).toContain("全球股票")
+    expect(frame).toContain("US USD")
+    expectFrameFits(app.render(79), 79)
+  } finally {
+    await app.dispose()
+  }
+})

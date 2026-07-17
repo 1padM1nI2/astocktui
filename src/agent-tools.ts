@@ -1,7 +1,7 @@
 import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
 import type { CommandContext, RefreshTarget, WorkspaceName } from "./commands"
-import type { OrderQuantity, TradeSide } from "./trading"
+import type { OrderQuantity, TradeQuote, TradeSide } from "./trading"
 
 function jsonResult(value: unknown): AgentToolResult<unknown> {
   return {
@@ -14,7 +14,12 @@ function requiredQuoteError(code: string): Error {
   return new Error(`无法获取股票行情：${code}`)
 }
 
+function tradeQuoteAtPrice(quote: TradeQuote, price: number | undefined): TradeQuote {
+  return price === undefined ? quote : { ...quote, price }
+}
+
 const quantitySchema = z.union([z.number().int().positive(), z.literal("all")])
+const priceSchema = z.number().positive()
 
 interface WatchlistToolInput {
   readonly action: "list" | "add" | "remove"
@@ -25,6 +30,7 @@ interface TradeToolInput {
   readonly side: TradeSide
   readonly code: string
   readonly quantity: OrderQuantity
+  readonly price?: number
 }
 
 interface NewsToolInput {
@@ -156,11 +162,13 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
     {
       name: "preview_trade",
       label: "预览模拟交易",
-      description: "按最新行情预览模拟买卖的金额、费用、资金和实现盈亏，不会成交。",
+      description:
+        "按最新行情或用户指定的历史、假设价格预览模拟买卖的金额、费用、资金和实现盈亏，不会成交。",
       parameters: z.object({
         side: z.enum(["buy", "sell"]),
         code: z.string(),
         quantity: quantitySchema,
+        price: priceSchema.optional(),
       }),
       intent: "omit",
       approval: "read",
@@ -168,7 +176,9 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
         const input = params as TradeToolInput
         const quote = await context.quote(input.code)
         if (quote === undefined) throw requiredQuoteError(input.code)
-        const result = context.trading().preview(input.side, quote, input.quantity)
+        const result = context
+          .trading()
+          .preview(input.side, tradeQuoteAtPrice(quote, input.price), input.quantity)
         if (!result.ok || result.preview === undefined) throw new Error(result.message)
         return jsonResult(result.preview)
       },
@@ -177,20 +187,23 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
       name: "execute_trade",
       label: "执行模拟交易",
       description:
-        "仅在用户明确要求下，按最新行情执行本地模拟买卖；复用 A 股整手、资金、费用和 T+1 风控。绝不连接真实券商。",
+        "Agent 可基于已读取数据自主执行本地模拟买卖，无需逐笔用户确认；复用 A 股整手、资金、费用和 T+1 风控，绝不连接真实券商。",
       parameters: z.object({
         side: z.enum(["buy", "sell"]),
         code: z.string(),
         quantity: quantitySchema,
+        price: priceSchema.optional(),
       }),
       intent: "omit",
-      approval: { tier: "exec", reason: "将修改并持久化本地模拟账户" },
+      approval: "write",
       concurrency: "exclusive",
       execute: async (_id, params) => {
         const input = params as TradeToolInput
         const quote = await context.quote(input.code)
         if (quote === undefined) throw requiredQuoteError(input.code)
-        const result = context.trading().execute(input.side, quote, input.quantity)
+        const result = context
+          .trading()
+          .execute(input.side, tradeQuoteAtPrice(quote, input.price), input.quantity)
         if (!result.ok) throw new Error(result.message)
         context.portfolioChanged()
         return jsonResult(result)

@@ -16,6 +16,7 @@ describe("Agent 主聊天面板", () => {
     expect(lines).toHaveLength(15)
     expect(lines[0]).toContain("╭")
     expect(lines[0]).toContain("Agent / 上下文")
+    expect(lines[0]).not.toContain("600519 贵州茅台")
     expect(lines[0]).toContain("╮")
     expect(lines.at(-1)).toContain("╯")
     expect(lines.at(-2)).toContain(">_")

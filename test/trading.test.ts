@@ -67,6 +67,22 @@ describe("A 股模拟交易引擎", () => {
     expect(service.snapshot.cash).toBe(100_000)
   })
 
+  test("海外股票仅可分析，预览和执行均不得修改 A 股模拟账户", () => {
+    const service = new PaperTradingService()
+    const globalQuote: TradeQuote = { code: "US:AAPL", name: "Apple", price: 210 }
+
+    expect(service.preview("buy", globalQuote, 100)).toMatchObject({
+      ok: false,
+      message: "海外股票当前仅支持分析",
+    })
+    expect(service.execute("buy", globalQuote, 100)).toMatchObject({
+      ok: false,
+      message: "海外股票当前仅支持分析",
+    })
+    expect(service.snapshot.positions).toEqual([])
+    expect(service.trades).toEqual([])
+  })
+
   test("当日买入不可卖，下一交易日可卖并计算实现盈亏", () => {
     const clock = tradingClock()
     const service = new PaperTradingService({ now: clock.now })

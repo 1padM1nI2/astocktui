@@ -1,28 +1,17 @@
 import type { Component } from "@oh-my-pi/pi-tui"
 import type { AgentController } from "./agent-controller"
+import { AgentExtensionRuntime } from "./agent-extensions"
 import { AgentScrollState } from "./agent-scroll"
-import {
-  AGENT,
-  MARKET,
-  NEWS,
-  renderAppFrame,
-  TAB_COUNT,
-  WORKSPACE_INDEX,
-  WORKSPACE_NAMES,
-} from "./app-render"
+import { AppInputHandler } from "./app-input"
+import { MARKET, renderAppFrame, WORKSPACE_INDEX, WORKSPACE_NAMES } from "./app-render"
 import { AutoRefreshController, type RefreshScheduler } from "./auto-refresh"
 import { CommandPrompt } from "./command-prompt"
-import {
-  type CommandContext,
-  type CommandExecution,
-  executeCommand,
-  type RefreshReport,
-} from "./commands"
+import { type CommandContext, executeCommand, type RefreshReport } from "./commands"
 import { MarketWorkspace } from "./components/market"
 import { NewsWorkspace } from "./components/news"
 import { PortfolioWorkspace } from "./components/portfolio"
 import { TradeHistoryWorkspace } from "./components/trade-history"
-import { type MarketDataSource, StockApiMarketDataSource } from "./market-data"
+import { createDefaultMarketDataSource, type MarketDataSource } from "./market-data"
 import { type MarketOverviewDataSource, MarketOverviewService } from "./market-overview"
 import { PublicMarketOverviewDataSource } from "./market-overview-source"
 import type { NewsDataSource } from "./news-data"
@@ -35,7 +24,7 @@ import { WatchlistCoordinator } from "./watchlist-coordinator"
 export class MarketIntelligenceApp implements Component {
   onQuit: () => void = () => process.exit(0)
   #activeTab: number = MARKET
-  readonly #prompt = new CommandPrompt()
+  readonly #prompt: CommandPrompt
   readonly #market: MarketWorkspace
   readonly #news = new NewsWorkspace()
   readonly #portfolio: PortfolioWorkspace
@@ -51,17 +40,26 @@ export class MarketIntelligenceApp implements Component {
   readonly #newsSource: NewsDataSource
   #newsRefresh: Promise<void> | null = null
   readonly #agentScroll: AgentScrollState
+  readonly #extensions: AgentExtensionRuntime
+  readonly #input: AppInputHandler
 
   constructor(
-    marketSource: MarketDataSource = new StockApiMarketDataSource(),
+    marketSource: MarketDataSource = createDefaultMarketDataSource(),
     newsSource: NewsDataSource = new NewsNowDataSource(),
     viewportRows?: () => number,
     trading: PaperTradingService = new PaperTradingService(),
     refreshScheduler?: RefreshScheduler,
     watchlist: WatchlistService = new WatchlistService(),
-    agentFactory: (context: CommandContext) => AgentController = createPiAgentController,
+    agentFactory: (
+      context: CommandContext,
+      extensions?: AgentExtensionRuntime,
+    ) => AgentController = (context, extensions) =>
+      createPiAgentController(context, {}, extensions),
     marketOverviewSource: MarketOverviewDataSource = new PublicMarketOverviewDataSource(),
+    extensionFactory: () => AgentExtensionRuntime = () => new AgentExtensionRuntime(),
   ) {
+    this.#extensions = extensionFactory()
+    this.#prompt = new CommandPrompt(() => this.#extensions.getCommands())
     this.#marketSource = marketSource
     this.#newsSource = newsSource
     this.#trading = trading
@@ -82,8 +80,26 @@ export class MarketIntelligenceApp implements Component {
     })
     this.#agentScroll = new AgentScrollState(viewportRows)
     this.#marketOverview = new MarketOverviewService(marketOverviewSource)
-    this.#agent = agentFactory(this.#commandContext())
+    this.#agent = agentFactory(this.#commandContext(), this.#extensions)
+    this.#input = new AppInputHandler({
+      prompt: this.#prompt,
+      scroll: this.#agentScroll,
+      activeTab: () => this.#activeTab,
+      setActiveTab: (tab) => {
+        this.#activeTab = tab
+      },
+      executeCommand: (input) =>
+        executeCommand(input, this.#commandContext(), this.#extensions.getCommands()),
+      promptAgent: (input) => void this.#agent.prompt(input),
+      refreshMarket: () => void this.refreshMarket(),
+      refreshNews: () => void this.refreshNews(),
+      handleNewsInput: (input) => this.#news.handleInput(input),
+      onQuit: () => this.onQuit(),
+      onUpdate: () => this.onUpdate(),
+    })
     this.#agent.subscribe(() => this.onUpdate())
+    this.#extensions.subscribe(() => this.onUpdate())
+    void this.#extensions.initialize().then(() => this.onUpdate())
   }
 
   refreshMarket(): Promise<void> {
@@ -127,77 +143,22 @@ export class MarketIntelligenceApp implements Component {
   startAutoRefresh(): void {
     this.#autoRefresh.start()
   }
-
   stopAutoRefresh(): void {
     this.#autoRefresh.stop()
   }
-
+  async dispose(): Promise<void> {
+    this.stopAutoRefresh()
+    await this.#extensions.dispose()
+  }
   waitForCommand(): Promise<void> {
     return this.#prompt.whenIdle()
   }
-
   waitForAgent(): Promise<void> {
     return this.#agent.waitForIdle()
   }
 
   handleInput(data: string): void {
-    if (data === "\x03") {
-      this.onQuit()
-      return
-    }
-    if (data === "/") {
-      this.#activeTab = AGENT
-      this.#prompt.openPalette()
-      return
-    }
-
-    if (this.#activeTab !== AGENT && (data === "q" || data === "\x1b")) {
-      this.onQuit()
-      return
-    }
-
-    const handlePrompt = (): boolean =>
-      this.#prompt.handleInput(
-        data,
-        (input) => this.#executeCommand(input),
-        this.onUpdate,
-        (input) => void this.#agent.prompt(input),
-      )
-    if (this.#activeTab === AGENT && this.#prompt.isPaletteOpen) {
-      handlePrompt()
-      if (!this.#prompt.isPaletteOpen) this.#agentScroll.reset()
-      return
-    }
-    if (this.#activeTab === AGENT && this.#agentScroll.handleInput(data)) return
-
-    if (this.#activeTab === MARKET && (data === "r" || data === "R")) {
-      void this.refreshMarket()
-      return
-    }
-    if (this.#activeTab === NEWS && (data === "r" || data === "R")) {
-      void this.refreshNews()
-      return
-    }
-    if (data === "\t" || data === "\x1b[C") {
-      this.#activeTab = (this.#activeTab + 1) % TAB_COUNT
-      return
-    }
-    if (data === "\x1b[Z" || data === "\x1b[D") {
-      this.#activeTab = (this.#activeTab - 1 + TAB_COUNT) % TAB_COUNT
-      return
-    }
-    if (this.#activeTab === NEWS) {
-      this.#news.handleInput(data)
-      return
-    }
-    if (this.#activeTab === AGENT) {
-      const handled = handlePrompt()
-      if (handled && (data === "\r" || data === "\n")) this.#agentScroll.reset()
-    }
-  }
-
-  #executeCommand(input: string): CommandExecution {
-    return executeCommand(input, this.#commandContext())
+    this.#input.handle(data)
   }
 
   #commandContext(): CommandContext {
@@ -240,6 +201,9 @@ export class MarketIntelligenceApp implements Component {
       },
       watchlist: () => this.#watchlist.watchlist,
       changeWatchlist: (action, code) => this.#watchlist.change(action, code),
+      invokeSkill: (name, args) =>
+        this.#extensions.invokeSkill(name, args, (input) => void this.#agent.prompt(input)),
+      mcpCommand: (args) => this.#extensions.mcpCommand(args),
     }
   }
 

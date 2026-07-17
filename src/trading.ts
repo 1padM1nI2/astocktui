@@ -1,3 +1,4 @@
+import { isAshareCode } from "./market-code"
 import type { MarketQuote } from "./market-data"
 import type { PortfolioPosition, PortfolioSnapshot } from "./portfolio"
 import {
@@ -92,6 +93,7 @@ export class PaperTradingService {
   }
 
   preview(side: TradeSide, quote: TradeQuote, quantity: OrderQuantity): TradeResult {
+    if (!isAshareCode(quote.code)) return { ok: false, message: "海外股票当前仅支持分析" }
     if (!Number.isFinite(quote.price) || quote.price <= 0) {
       return { ok: false, message: `价格无效：${quote.price}` }
     }

@@ -34,3 +34,13 @@ describe("行情自选股服务", () => {
     expect(service.codes).toEqual(["SH600519"])
   })
 })
+
+test("美日和韩国股票以规范市场前缀加入并可移除", () => {
+  const service = new WatchlistService({ codes: ["SH600519"] })
+
+  expect(service.add("us:aapl")).toMatchObject({ ok: true, code: "US:AAPL" })
+  expect(service.add("JP:7203")).toMatchObject({ ok: true, code: "JP:7203" })
+  expect(service.add("kr:005930")).toMatchObject({ ok: true, code: "KR:005930" })
+  expect(service.remove("US:AAPL")).toMatchObject({ ok: true, code: "US:AAPL" })
+  expect(service.add("HK:0700").message).toContain("US:AAPL")
+})

@@ -1,0 +1,16 @@
+{
+  "id": "snapshot_1784257369620_6g58x4o1p",
+  "approvalId": "approval_1784257369612_lxu6baa66",
+  "approvalTitle": "自主模拟交易需求规格",
+  "version": 1,
+  "timestamp": "2026-07-17T03:02:49.620Z",
+  "trigger": "initial",
+  "status": "pending",
+  "content": "# Requirements Document\n\n## Introduction\n\n让 AStockTUI 内置 Agent 在本地模拟账户中自主执行买卖和调仓：Agent 根据用户的分析任务、实时行情、新闻、持仓和已加载 Skill/MCP 数据判断后，可直接调用模拟交易工具，不再要求当前输入包含“买入”“卖出”“交易”等明确授权字样，也不产生二次确认中断。\n\n范围严格限定为本地 `PaperTradingService` 模拟账户。系统不提供、不会推断、也不会连接真实券商下单能力。清空全部账户继续要求明确重置意图。\n\n## Alignment with Product Vision\n\nAStockTUI 是市场智能终端。自主模拟执行让 Agent 可以将跨市场分析、仓位诊断和调仓建议直接反映到模拟账户，同时继续以可复现的资金、费用、整手和 T+1 模型记录结果，便于观察策略行为而不是停在逐笔确认流程。\n\n## Requirements\n\n### Requirement 1：无确认的自主模拟交易\n\n**User Story:** 作为用户，我希望 Agent 可自行操作本地模拟持仓，而不被每笔交易的文字授权或确认步骤打断。\n\n#### Acceptance Criteria\n\n1. WHEN Agent 在任意有效分析请求中决定调用 `execute_trade` THEN 系统 SHALL 允许该模拟买卖调用，不得根据用户输入是否包含买卖关键词、确认词或“仅分析”文字拦截它。\n2. WHEN Agent 对某笔模拟交易执行前调用 `preview_trade` THEN 系统 SHALL 允许后续 `execute_trade` 直接继续，不得要求用户二次确认。\n3. WHEN Agent 未调用任何交易工具 THEN 系统 SHALL 不得声称已完成买卖、调仓或持仓修改。\n4. WHEN 模拟交易完成或失败 THEN Agent 面板 SHALL 显示工具的执行结果、失败原因或成交摘要。\n\n### Requirement 2：保留模拟账户与市场模型不变量\n\n**User Story:** 作为用户，我希望去除人工确认中断时，模拟账户仍保持可计算、可审计的 A 股账户状态。\n\n#### Acceptance Criteria\n\n1. WHEN Agent 自主发起模拟买卖 THEN 系统 SHALL 继续执行价格有效性、整手数量、可用资金、费用、持仓、可卖数量和 T+1 校验。\n2. IF 交易不满足上述任一账户或市场规则 THEN 系统 SHALL 拒绝该笔模拟交易且不得修改现金、持仓或成交记录；这不是人工确认中断。\n3. WHEN 模拟交易成功 THEN 系统 SHALL 按现有交易服务写入成交、更新时间与持仓，不得创建旁路账户状态。\n4. WHEN 标的是非 A 股全球代码 THEN 系统 SHALL 继续仅允许分析，不得将其交给 `PaperTradingService` 模拟成交。\n\n### Requirement 3：账户重置仍需显式意图\n\n**User Story:** 作为用户，我希望 Agent 可自主调仓，但不会因为分析过程意外清空全部模拟账户。\n\n#### Acceptance Criteria\n\n1. WHEN Agent 调用 `reset_paper_account` THEN 系统 SHALL 继续要求当前请求明确表达重置或清空全部账户的意图。\n2. IF 当前输入仅为市场分析、持仓诊断、调仓或买卖任务 THEN 系统 SHALL 阻止 `reset_paper_account`。\n3. WHEN 重置被阻止 THEN 系统 SHALL 保持现金、持仓和成交记录不变，并在 Agent 工具结果中显示原因。\n\n### Requirement 4：透明的自主执行语义\n\n**User Story:** 作为用户，我希望看到 Agent 是自主模拟执行，而不是被误导为真实交易或收益保证。\n\n#### Acceptance Criteria\n\n1. WHEN Agent 的系统提示被构造 THEN 系统 SHALL 明确其可自主执行本地模拟买卖、绝不连接真实券商，并要求将事实、推断和模拟执行区分说明。\n2. WHEN 用户执行普通分析请求 THEN Agent MAY 自主调仓；其回答 SHALL 列出执行依据、风险与实际调用的模拟工具结果。\n3. WHEN Agent 数据不足、市场关闭或来源诊断显示错误 THEN Agent SHALL 在回答中说明限制，不得伪造执行依据或实时性。\n\n## Non-Functional Requirements\n\n### Code Architecture and Modularity\n- 自主交易策略只改变 Pi Agent 的工具调用授权边界；账户校验继续集中在 `PaperTradingService`，不得复制、绕过或弱化交易服务。\n- 复用现有 `authorizeAgentTool`、`PiAgentDriver`、`createAStockAgentTools` 和 Agent 工具生命周期事件；任一源文件不得超过 250 个非空行。\n\n### Performance\n- 取消授权检查不得引入额外网络请求、轮询、后台交易循环或延迟。\n- 交易工具仍沿用独占并发模式，防止同一会话内并发修改账户。\n\n### Security\n- 本功能仅操作内存/持久化的本地模拟账户；不得新增真实券商、支付、转账或外部交易 API。\n- API 密钥、账户文件内容和 Skill/MCP 敏感信息不得出现在授权错误或 Agent 面板中。\n\n### Reliability\n- 测试 SHALL 覆盖：任意分析文本可直接自主模拟交易、否定/仅分析文本不再拦截交易、资金/整手/T+1/海外代码仍拒绝且无状态修改、账户重置仍被显式意图门禁保护。\n\n### Usability\n- 不显示每笔交易的确认或审批提示；Agent 面板通过既有工具调用层级显示执行过程。\n- 所有 TUI 行继续符合宽度限制，文字为简体中文。\n",
+  "fileStats": {
+    "size": 5194,
+    "lines": 77,
+    "lastModified": "2026-07-17T03:02:40.977Z"
+  },
+  "comments": []
+}

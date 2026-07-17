@@ -1,3 +1,4 @@
+import type { CommandExecution } from "./commands"
 import type { MarketSnapshot } from "./market-data"
 import type { MarketOverviewSnapshot } from "./market-overview"
 import type { FinancialNewsSnapshot } from "./news-data"
@@ -44,4 +45,6 @@ export interface CommandContext {
   portfolioChanged(): void
   watchlist(): readonly string[]
   changeWatchlist(action: "add" | "remove", code: string): Promise<WatchlistChange>
+  invokeSkill?(name: string, args: readonly string[]): CommandExecution
+  mcpCommand?(args: readonly string[]): CommandExecution
 }

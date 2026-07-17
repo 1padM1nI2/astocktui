@@ -22,11 +22,15 @@ export function createDemo(
     undefined,
     watchlist,
   )
+  let quitting = false
   app.onQuit = () => {
-    app.stopAutoRefresh()
-    tui.stop()
-    tui.terminal.clearScreen()
-    process.exit(0)
+    if (quitting) return
+    quitting = true
+    void app.dispose().finally(() => {
+      tui.stop()
+      tui.terminal.clearScreen()
+      process.exit(0)
+    })
   }
   app.onUpdate = () => tui.requestComponentRender(app)
   tui.addChild(app)

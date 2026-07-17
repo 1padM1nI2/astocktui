@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/global-market-data/tasks.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-07-17T02:30:27.621Z",
+      "trigger": "initial",
+      "approvalId": "approval_1784255427617_6pjcmlf6e",
+      "approvalTitle": "全球市场数据实施任务"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-07-17T02:30:54.823Z",
+      "trigger": "approved",
+      "approvalId": "approval_1784255427617_6pjcmlf6e",
+      "approvalTitle": "全球市场数据实施任务"
+    }
+  ]
+}

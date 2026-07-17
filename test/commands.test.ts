@@ -79,6 +79,7 @@ describe("应用命令注册表", () => {
       "sell",
       "trades",
       "account",
+      "mcp",
       "clear",
       "quit",
     ])

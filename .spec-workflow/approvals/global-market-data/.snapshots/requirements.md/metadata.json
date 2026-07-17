@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/global-market-data/requirements.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-07-17T01:00:05.213Z",
+      "trigger": "initial",
+      "approvalId": "approval_1784250005208_hzeoucxnf",
+      "approvalTitle": "全球市场数据需求规格"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-07-17T01:01:15.267Z",
+      "trigger": "approved",
+      "approvalId": "approval_1784250005208_hzeoucxnf",
+      "approvalTitle": "全球市场数据需求规格"
+    }
+  ]
+}

@@ -147,6 +147,42 @@ describe("AStock Pi Agent 工具", () => {
     expect(await runTool(tools, "get_trade_history")).toEqual([])
   })
 
+  test("Agent 行情工具保留全球市场的币种、状态和时间元数据", async () => {
+    const state = toolContext()
+    const tools = createAStockAgentTools({
+      ...state.context,
+      marketSnapshot: () => ({
+        quotes: [
+          {
+            code: "US:AAPL",
+            name: "Apple",
+            price: 210,
+            changePercent: 1.25,
+            source: "yahoo",
+            market: "US" as const,
+            currency: "USD",
+            marketState: "closed" as const,
+            asOf: 1_752_634_800_000,
+          },
+        ],
+        trend: [209, 210],
+        source: "Yahoo Finance",
+      }),
+    })
+
+    expect(await runTool(tools, "get_market_snapshot")).toMatchObject({
+      quotes: [
+        {
+          code: "US:AAPL",
+          market: "US",
+          currency: "USD",
+          marketState: "closed",
+          asOf: 1_752_634_800_000,
+        },
+      ],
+    })
+  })
+
   test("Agent 交易复用模拟账户风控并更新持仓", async () => {
     const state = toolContext()
     const tools = createAStockAgentTools(state.context)
@@ -167,6 +203,36 @@ describe("AStock Pi Agent 工具", () => {
     expect(executed).toMatchObject({ ok: true, trade: { id: "SIM-0001" } })
     expect(state.trading.snapshot.positions[0]?.quantity).toBe(100)
     expect(state.portfolioChanges).toBe(1)
+  })
+
+  test("自主模拟交易工具声明为无需执行批准的本地写操作", () => {
+    const tool = createAStockAgentTools(toolContext().context).find(
+      (candidate) => candidate.name === "execute_trade",
+    )
+
+    expect(tool).toMatchObject({ approval: "write", concurrency: "exclusive" })
+  })
+
+  test("Agent 可按用户指定的历史或假设价格模拟成交", async () => {
+    const state = toolContext()
+    const tools = createAStockAgentTools(state.context)
+
+    const preview = await runTool(tools, "preview_trade", {
+      side: "buy",
+      code: "600519",
+      quantity: 100,
+      price: 88.5,
+    })
+    expect(preview).toMatchObject({ price: 88.5, grossAmount: 8_850 })
+
+    const executed = await runTool(tools, "execute_trade", {
+      side: "buy",
+      code: "600519",
+      quantity: 100,
+      price: 88.5,
+    })
+    expect(executed).toMatchObject({ ok: true, trade: { price: 88.5, grossAmount: 8_850 } })
+    expect(state.trading.snapshot.positions[0]?.currentPrice).toBe(88.5)
   })
 
   test("Agent 可以刷新、管理自选股、切换焦点并显式重置模拟账户", async () => {

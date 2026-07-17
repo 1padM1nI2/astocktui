@@ -40,6 +40,59 @@ const NAME_WIDTH = 10
 const PRICE_WIDTH = 10
 const CHANGE_WIDTH = 9
 const TABLE_GAP = "  "
+const FULL_CODE_WIDTH = 9
+const MARKET_WIDTH = 8
+const STATE_WIDTH = 6
+
+function displayCode(code: string): string {
+  return /^(?:SH|SZ)\d{6}$/u.test(code)
+    ? code.slice(2)
+    : code.startsWith("US:") || code.startsWith("JP:") || code.startsWith("KR:")
+      ? code.slice(3)
+      : code
+}
+
+function marketLabel(quote: MarketQuote | undefined, code: string): string {
+  const market =
+    quote?.market ??
+    (code.startsWith("US:")
+      ? "US"
+      : code.startsWith("JP:")
+        ? "JP"
+        : code.startsWith("KR:")
+          ? "KR"
+          : "CN")
+  const currency =
+    quote?.currency ??
+    (market === "US" ? "USD" : market === "JP" ? "JPY" : market === "KR" ? "KRW" : "CNY")
+  return `${market} ${currency}`
+}
+
+function stateLabel(quote: MarketQuote | undefined): string {
+  if (quote?.marketState === "open") return "交易中"
+  if (quote?.marketState === "closed") return "已收盘"
+  if (quote?.marketState === "delayed") return "延迟"
+  return "--"
+}
+
+function renderFullTableRow(cells: readonly string[], width: number): string {
+  const columns = [
+    FULL_CODE_WIDTH,
+    MARKET_WIDTH,
+    NAME_WIDTH,
+    PRICE_WIDTH,
+    CHANGE_WIDTH,
+    STATE_WIDTH,
+  ]
+  return fitLine(
+    cells
+      .map((cell, index) =>
+        alignCell(cell, columns[index] ?? NAME_WIDTH, index < 3 ? "left" : "right"),
+      )
+      .join(TABLE_GAP),
+    width,
+  )
+}
 
 function renderTableRow(
   code: string,
@@ -118,36 +171,66 @@ export class MarketWorkspace implements Component {
     }
 
     const lines: string[] = []
-    lines.push(fitLine(`行情 / 沪深A股 实时 ${status}`, safeWidth))
+    const hasGlobal = this.#watchlistCodes.some((code) => code.includes(":"))
+    const expanded = safeWidth >= 64
+    lines.push(fitLine(`行情 / ${hasGlobal ? "全球股票" : "沪深A股"} 实时 ${status}`, safeWidth))
     lines.push("─".repeat(safeWidth))
     lines.push(renderSparkline(this.#snapshot?.trend ?? [], safeWidth))
-    lines.push(renderTableRow("代码", "名称", "现价", "涨跌幅", safeWidth))
+    lines.push(
+      expanded
+        ? renderFullTableRow(["代码", "市场/币种", "名称", "现价", "涨跌幅", "状态"], safeWidth)
+        : renderTableRow("代码", "名称", "现价", "涨跌幅", safeWidth),
+    )
     for (const code of this.#watchlistCodes) {
       const quote = this.#quotesByCode[code]
       if (quote === undefined) {
         lines.push(
-          renderTableRow(
-            code.slice(2),
-            DEFAULT_NAMES.get(code) ?? "等待行情",
-            "--",
-            "--",
-            safeWidth,
-          ),
+          expanded
+            ? renderFullTableRow(
+                [
+                  code,
+                  marketLabel(undefined, code),
+                  DEFAULT_NAMES.get(code) ?? "等待行情",
+                  "--",
+                  "--",
+                  "--",
+                ],
+                safeWidth,
+              )
+            : renderTableRow(
+                displayCode(code),
+                DEFAULT_NAMES.get(code) ?? "等待行情",
+                "--",
+                "--",
+                safeWidth,
+              ),
         )
         continue
       }
-
       const sign = quote.changePercent > 0 ? "+" : ""
       const color = trendColor(quote.changePercent)
       const reset = color.length > 0 ? ANSI.reset : ""
+      const change = `${color}${sign}${quote.changePercent.toFixed(2)}%${reset}`
       lines.push(
-        renderTableRow(
-          quote.code.slice(2),
-          quote.name,
-          quote.price.toFixed(2),
-          `${color}${sign}${quote.changePercent.toFixed(2)}%${reset}`,
-          safeWidth,
-        ),
+        expanded
+          ? renderFullTableRow(
+              [
+                quote.code,
+                marketLabel(quote, quote.code),
+                quote.name,
+                quote.price.toFixed(2),
+                change,
+                stateLabel(quote),
+              ],
+              safeWidth,
+            )
+          : renderTableRow(
+              displayCode(quote.code),
+              quote.name,
+              quote.price.toFixed(2),
+              change,
+              safeWidth,
+            ),
       )
     }
     return lines

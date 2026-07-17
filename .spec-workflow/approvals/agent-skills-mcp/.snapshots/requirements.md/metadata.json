@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/agent-skills-mcp/requirements.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-07-16T09:01:07.389Z",
+      "trigger": "initial",
+      "approvalId": "approval_1784192467384_xgdfpz01y",
+      "approvalTitle": "Agent Skill 与 MCP 需求"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-07-16T09:14:41.314Z",
+      "trigger": "approved",
+      "approvalId": "approval_1784192467384_xgdfpz01y",
+      "approvalTitle": "Agent Skill 与 MCP 需求"
+    }
+  ]
+}

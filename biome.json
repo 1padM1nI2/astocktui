@@ -19,6 +19,9 @@
       "correctness": {
         "noUnusedVariables": "error",
         "noUnusedImports": "error"
+      },
+      "complexity": {
+        "useLiteralKeys": "off"
       }
     }
   },
@@ -35,6 +38,6 @@
     }
   },
   "files": {
-    "includes": ["**", "!**/node_modules", "!**/dist", "!**/.omo"]
+    "includes": ["**", "!**/node_modules", "!**/dist", "!**/.omo", "!.spec-workflow/approvals"]
   }
 }

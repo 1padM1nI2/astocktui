@@ -1,4 +1,5 @@
-import { DEFAULT_WATCHLIST_CODES, normalizeAshareCode } from "./market-data"
+import { normalizeMarketCode } from "./market-code"
+import { DEFAULT_WATCHLIST_CODES } from "./market-data"
 
 export interface WatchlistState {
   readonly version: 1
@@ -36,7 +37,7 @@ export class WatchlistService {
   }
 
   add(rawCode: string): WatchlistChange {
-    const code = normalizeAshareCode(rawCode)
+    const code = normalizeMarketCode(rawCode)
     if (code === null) return invalidCode()
     if (this.#codes.includes(code)) return { ok: false, code, message: `已在自选股中：${code}` }
 
@@ -47,7 +48,7 @@ export class WatchlistService {
   }
 
   remove(rawCode: string): WatchlistChange {
-    const code = normalizeAshareCode(rawCode)
+    const code = normalizeMarketCode(rawCode)
     if (code === null) return invalidCode()
     const index = this.#codes.indexOf(code)
     if (index < 0) return { ok: false, code, message: `不在自选股中：${code}` }
@@ -73,17 +74,14 @@ export class WatchlistService {
 }
 
 function invalidCode(): WatchlistChange {
-  return {
-    ok: false,
-    message: "股票代码格式无效，需使用 600519、SH600519 或 SZ000001",
-  }
+  return { ok: false, message: "股票代码格式无效，示例：600519、US:AAPL、JP:7203 或 KR:005930" }
 }
 
 function normalizeInitialCodes(codes: readonly string[]): string[] {
   if (codes.length === 0) throw new Error("自选股至少保留一只股票")
   const normalized: string[] = []
   for (const rawCode of codes) {
-    const code = normalizeAshareCode(rawCode)
+    const code = normalizeMarketCode(rawCode)
     if (code === null) throw new Error(`自选股代码无效：${rawCode}`)
     if (normalized.includes(code)) throw new Error(`自选股代码重复：${code}`)
     normalized.push(code)

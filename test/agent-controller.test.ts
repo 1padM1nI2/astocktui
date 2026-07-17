@@ -29,6 +29,23 @@ class FakeAgentDriver implements AgentDriver {
   abort(): void {}
 }
 
+class AutonomousTradeDriver implements AgentDriver {
+  async run(_input: string, emit: (event: AgentDriverEvent) => void): Promise<void> {
+    emit({ type: "tool_start", id: "trade-1", name: "execute_trade", label: "执行模拟交易" })
+    emit({
+      type: "tool_end",
+      id: "trade-1",
+      name: "execute_trade",
+      label: "执行模拟交易",
+      summary: "模拟买入成交",
+      isError: false,
+    })
+    emit({ type: "text_delta", delta: "已基于分析完成本地模拟调仓。" })
+  }
+  clear(): void {}
+  abort(): void {}
+}
+
 describe("Pi Agent 会话控制器", () => {
   test("流式汇总回答、工具状态并通知界面重绘", async () => {
     const driver = new FakeAgentDriver()
@@ -53,6 +70,22 @@ describe("Pi Agent 会话控制器", () => {
       },
     ])
     expect(updates).toBeGreaterThan(3)
+  })
+
+  test("普通分析请求可呈现自主模拟交易结果而不需要确认步骤", async () => {
+    const controller = new AgentController(new AutonomousTradeDriver(), "test/model")
+
+    await controller.prompt("分析持仓风险")
+
+    expect(controller.view.status).toBe("completed")
+    expect(controller.view.answer).toContain("本地模拟调仓")
+    expect(controller.view.tools).toEqual([
+      expect.objectContaining({
+        name: "execute_trade",
+        status: "completed",
+        summary: "模拟买入成交",
+      }),
+    ])
   })
 
   test("模型错误显示在会话状态且不会遗留运行中状态", async () => {

@@ -115,7 +115,7 @@ test("createDemo 挂载工作台、设置焦点并在启动时刷新行情和新
   app.stopAutoRefresh()
 })
 
-test("退出时先停止 TUI、清空画面，再结束进程", () => {
+test("退出时先释放扩展、停止 TUI、清空画面，再结束进程", async () => {
   const terminal = new MemoryTerminal()
   const tui = new TUI(terminal)
   const pendingSnapshot = Promise.withResolvers<MarketSnapshot>().promise
@@ -123,7 +123,7 @@ test("退出时先停止 TUI、清空画面，再结束进程", () => {
   const exit = spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit)
 
   try {
-    createDemo(
+    const app = createDemo(
       tui,
       {
         loadSnapshot(): Promise<MarketSnapshot> {
@@ -138,6 +138,7 @@ test("退出时先停止 TUI、清空画面，再结束进程", () => {
     )
     tui.start()
     terminal.send("q")
+    await app.dispose()
 
     expect(terminal.lifecycle).toEqual(["stop", "clear"])
     expect(exit).toHaveBeenCalledWith(0)

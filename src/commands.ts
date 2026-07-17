@@ -44,8 +44,11 @@ function error(message: string, usage?: string): CommandResult {
   return output("命令错误", lines)
 }
 
-function findCommand(name: string): AppCommand | undefined {
-  return APP_COMMANDS.find((command) => command.name === name || command.aliases.includes(name))
+function findCommand(
+  name: string,
+  commands: readonly AppCommand[] = APP_COMMANDS,
+): AppCommand | undefined {
+  return commands.find((command) => command.name === name || command.aliases.includes(name))
 }
 
 function dataStatusLabel(status: DataStatus): string {
@@ -186,6 +189,15 @@ export const APP_COMMANDS: readonly AppCommand[] = [
   },
   ...TRADING_COMMANDS,
   {
+    name: "mcp",
+    aliases: [],
+    category: "system",
+    usage: "/mcp [list|reload|reconnect <server>]",
+    description: "查看、重载或重连 MCP server",
+    execute: (context, args) =>
+      context.mcpCommand === undefined ? error("MCP 扩展未就绪") : context.mcpCommand(args),
+  },
+  {
     name: "clear",
     aliases: [],
     category: "system",
@@ -216,23 +228,31 @@ export function isBareCommand(input: string): boolean {
   return command?.bareNames?.includes(name) === true && !/\s/.test(name)
 }
 
-export function filterCommands(input: string): readonly AppCommand[] {
+export function filterCommands(
+  input: string,
+  additional: readonly AppCommand[] = [],
+): readonly AppCommand[] {
+  const commands = [...APP_COMMANDS, ...additional]
   const trimmed = input.trimStart()
   const withoutSlash = trimmed.startsWith("/") ? trimmed.slice(1) : trimmed
   const token = withoutSlash.split(/\s/, 1)[0]?.toLowerCase() ?? ""
-  if (token.length === 0) return APP_COMMANDS
-  return APP_COMMANDS.filter(
+  if (token.length === 0) return commands
+  return commands.filter(
     (command) =>
       command.name.startsWith(token) || command.aliases.some((alias) => alias.startsWith(token)),
   )
 }
 
-export function executeCommand(input: string, context: CommandContext): CommandExecution {
+export function executeCommand(
+  input: string,
+  context: CommandContext,
+  additional: readonly AppCommand[] = [],
+): CommandExecution {
   const trimmed = input.trim()
   const hasSlash = trimmed.startsWith("/")
   const parts = (hasSlash ? trimmed.slice(1) : trimmed).split(/\s+/)
   const name = parts.shift()?.toLowerCase() ?? ""
-  const command = findCommand(name)
+  const command = findCommand(name, [...APP_COMMANDS, ...additional])
   if (command === undefined) return error(`未知命令 /${name}`, "/help [command]")
   if (!hasSlash && (command.bareNames?.includes(name) !== true || parts.length > 0)) {
     return error("命令必须以 / 开头")

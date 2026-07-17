@@ -1,0 +1,86 @@
+# Requirements Document
+
+## Introduction
+
+为 AStockTUI 的内置 Pi Agent 增加与 Oh My Pi（OMP）一致的 Skill 与 MCP 扩展能力。Skill 提供按需加载的文件型工作流和领域知识；MCP 将经配置的外部 server 工具接入 Agent。两者必须保持 TUI 可用性，并且不得绕过本地模拟账户的既有风控。
+
+## Alignment with Product Vision
+
+AStockTUI 是键盘优先的市场智能终端。Skill 允许研究、估值、财报解读等能力以可维护的包形式扩展；MCP 允许用户接入受信任的外部数据和分析服务，同时保留本地行情、新闻与模拟交易工具的统一体验。
+
+## Requirements
+
+### Requirement 1：OMP 兼容的 Skill 发现与读取
+
+**User Story:** 作为 AStockTUI 用户，我希望 Agent 能发现项目级和用户级 Skill，并在需要时读取其内容，以便复用标准化的分析工作流而不是把所有说明写入固定提示词。
+
+#### Acceptance Criteria
+
+1. WHEN 启动 Agent THEN 系统 SHALL 按 OMP 的一层目录约定发现 `<root>/skills/<name>/SKILL.md`，并支持项目级 `.omp/skills/`、用户级 `~/.omp/agent/skills/` 与 OMP 兼容的 `.agents/skills/`、`.claude/skills/`、`.codex/skills/`、`.github/skills/` 来源。
+2. WHEN 多个来源包含相同 Skill 名称 THEN 系统 SHALL 按 OMP 优先级保留最高优先级来源，并报告冲突而不静默随机选择。
+3. WHEN `SKILL.md` 包含 YAML frontmatter THEN 系统 SHALL 识别至少 `name`、`description`、`hide`、`disableModelInvocation` 与 `alwaysApply`，并将正文与 frontmatter 分离。
+4. WHEN Agent 可使用 read 工具 THEN 系统 SHALL 在系统提示中暴露未隐藏 Skill 的名称和描述，并提供受路径边界保护的 `skill://<name>` 与 `skill://<name>/<relative-path>` 读取能力。
+5. WHEN 用户输入 `/skill:<name> [args]` THEN 系统 SHALL 注入该 Skill 正文和可选参数作为 Agent 请求；未知、隐藏或禁止模型调用的 Skill SHALL 返回可见错误或不出现在可调用列表中。
+6. IF Skill 目录、frontmatter 或引用文件无效 THEN 系统 SHALL 隔离该 Skill 的错误，并继续加载其他有效 Skill。
+
+### Requirement 2：OMP 兼容的 MCP 配置与发现
+
+**User Story:** 作为 AStockTUI 用户，我希望能使用 OMP 风格配置声明 MCP server，以便 Agent 可以调用我选择的外部工具和数据源。
+
+#### Acceptance Criteria
+
+1. WHEN 启动 Agent THEN 系统 SHALL 从 `.omp/mcp.json`、`mcp.json`、`.mcp.json` 和用户级 `~/.omp/agent/mcp.json` 发现 `mcpServers`，并接受 OMP 的 `enabled`、`timeout`、`command`、`args`、`env`、`cwd`、`url` 与 `headers` 字段。
+2. WHEN MCP 配置使用 `${VAR}` 或 `${VAR:-default}` THEN 系统 SHALL 在加载时解析环境变量；未解析的占位符 SHALL 保持字面值且不得泄露其他环境变量。
+3. IF server 名称、传输类型或必填字段无效 THEN 系统 SHALL 对该 server 给出明确诊断，并继续加载其他 server 与本地 Agent 工具。
+4. WHEN 用户级配置将 server 列入 `disabledServers` 或 server 的 `enabled` 为 false THEN 系统 SHALL 不连接该 server。
+5. WHEN 同名 server 出现在多个配置来源 THEN 系统 SHALL 使用确定性的 OMP 风格优先级，并显示配置来源。
+
+### Requirement 3：MCP 传输、工具桥接与生命周期
+
+**User Story:** 作为 AStockTUI 用户，我希望已配置 MCP server 的工具能可靠地出现在 Agent 中，并且单个外部 server 故障不会阻断本地市场分析。
+
+#### Acceptance Criteria
+
+1. WHEN 配置 `type` 省略或为 `stdio` THEN 系统 SHALL 使用 JSON-RPC JSONL 子进程传输，并支持 `command`、`args`、`env` 与 `cwd`。
+2. WHEN 配置 `type` 为 `http` 或 `sse` THEN 系统 SHALL 使用对应的 MCP HTTP 或 legacy SSE 协议完成 `initialize`、`notifications/initialized`、`tools/list` 与 `tools/call`。
+3. WHEN 连接成功 THEN 系统 SHALL 将远端工具以稳定、命名空间隔离的 `mcp__<server>_<tool>` 名称桥接为 Pi Agent 工具，保留描述和输入 schema。
+4. WHEN server 连接、初始化、超时、工具调用或协议解析失败 THEN 系统 SHALL 将错误局限于该 server，在 Agent 面板显示诊断，并继续提供本地工具和健康 MCP server。
+5. WHEN server 连接意外关闭 THEN 系统 SHALL 按有限退避策略重连；显式 reload 或应用退出 SHALL 关闭所有 MCP 传输和子进程，不遗留后台进程。
+6. WHEN 用户请求 MCP 状态或 reload THEN 系统 SHALL 提供应用本地命令显示 server 状态、来源、错误与工具数，并在 reload 后刷新 Agent 工具集。
+
+### Requirement 4：安全与模拟交易边界
+
+**User Story:** 作为 AStockTUI 用户，我希望扩展能力不会越过模拟账户和本地应用的安全边界，以便可控地使用外部服务。
+
+#### Acceptance Criteria
+
+1. WHEN Skill 或 MCP 工具被调用 THEN 系统 SHALL 保持现有本地模拟交易授权、整手、资金、费用和 T+1 校验；扩展不得直接访问或替换 PaperTradingService。
+2. WHEN MCP 配置包含敏感值 THEN 系统 SHALL 支持环境变量引用，且不在 TUI、错误消息、Agent 提示词或持久化状态中回显解析后的秘密。
+3. WHEN 项目配置声明 stdio MCP server THEN 系统 SHALL 在连接前向用户清晰显示其命令、来源与状态，因为该配置可启动本地进程。
+4. WHEN 未配置任何 Skill 或 MCP server THEN 系统 SHALL 保持当前 Agent、本地工具、启动速度和现有命令行为。
+
+## Non-Functional Requirements
+
+### Code Architecture and Modularity
+- Skill discovery、Skill URL 读取、MCP config、transport、client、manager、tool bridge 与 TUI 命令必须位于独立聚焦模块。
+- 复用现有 `AgentTool`、`AgentController`、`CommandPrompt`、`fitLine` 和应用生命周期模式；任何源文件不得超过 250 个非空行。
+- MCP runtime 应以显式接口隔离 transport，便于 stdio、HTTP、SSE 分别测试。
+
+### Performance
+- Skill discovery 只扫描一层目录，避免递归全盘扫描。
+- MCP server 并行连接；慢或失败 server 不得阻塞本地 Agent 启动。
+- 仅将 Skill 元数据放入系统提示，Skill 正文按需读取或显式调用。
+
+### Security
+- 仅接受 `stdio`、`http`、`sse` 三种 MCP transport；HTTP URL 必须为 HTTP(S)。
+- 拒绝 `skill://` 绝对路径和 `..` 路径逃逸。
+- 不实现未配置的 OAuth 凭据代理；远程认证通过显式安全 headers 或环境变量提供。
+
+### Reliability
+- 配置、单个 Skill、单个 MCP server 的错误必须相互隔离。
+- 每个 stdio child、HTTP/SSE listener 都必须在 reload 与退出时确定性关闭。
+- MCP 工具 schema 或结果异常必须转换成可读工具错误，不得破坏 Agent 会话。
+
+### Usability
+- Skill 与 MCP 状态、错误、来源和可用工具数必须在固定宽度 TUI 行中通过 `fitLine` 呈现。
+- `/skill:<name>`、`/mcp list`、`/mcp reload` 与 `/mcp reconnect <name>` 使用现有命令面板、补全和键盘行为。

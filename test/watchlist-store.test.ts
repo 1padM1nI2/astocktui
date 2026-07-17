@@ -35,3 +35,17 @@ describe("自选股持久化", () => {
     }
   })
 })
+
+test("持久化存储保留全球股票的市场前缀", () => {
+  const temporary = temporaryWatchlistPath()
+  try {
+    const first = createPersistentWatchlistService({ path: temporary.path, codes: ["US:AAPL"] })
+    first.add("JP:7203")
+    first.add("KR:005930")
+
+    const restored = createPersistentWatchlistService({ path: temporary.path })
+    expect(restored.codes).toEqual(["US:AAPL", "JP:7203", "KR:005930"])
+  } finally {
+    rmSync(temporary.directory, { recursive: true, force: true })
+  }
+})

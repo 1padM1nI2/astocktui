@@ -7,7 +7,6 @@ import type { CommandPromptView } from "../command-prompt"
 import { fitLine } from "../width"
 import { renderFramedPanel } from "./framed-panel"
 
-const FOCUS_STOCK = "600519 贵州茅台"
 const DEFAULT_HEIGHT = 15
 
 function alignSides(left: string, right: string, width: number): string {
@@ -64,10 +63,7 @@ export class AgentWorkspace implements Component {
     const inputCursor = this.#active ? `${ANSI.reverse} ${ANSI.reset}` : ""
     if (safeHeight === 0) return []
     if (safeHeight < 3 || safeWidth < 5) {
-      const compact = [
-        `Agent / ${FOCUS_STOCK}`,
-        agentInputLine(this.#input, inputCursor, "", safeWidth),
-      ]
+      const compact = ["Agent / 上下文", agentInputLine(this.#input, inputCursor, "", safeWidth)]
       return Array.from({ length: safeHeight }, (_, index) =>
         fitLine(compact[index] ?? "", safeWidth),
       )
@@ -89,11 +85,7 @@ export class AgentWorkspace implements Component {
       status = `${statusColor}● ${label}${ANSI.reset}`
     }
     const focusMarker = this.#active ? "◆ " : ""
-    const title = alignSides(
-      `${focusMarker}Agent / 上下文 ${FOCUS_STOCK}`,
-      status,
-      Math.max(0, safeWidth - 5),
-    )
+    const title = alignSides(`${focusMarker}Agent / 上下文`, status, Math.max(0, safeWidth - 5))
     const lines: string[] = [
       `${ANSI.brightBlack}会话 1 · 模型 ${this.#agentView.modelLabel} · 上下文 行情 + 持仓 + 财经新闻${ANSI.reset}`,
     ]
