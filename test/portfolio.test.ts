@@ -34,6 +34,8 @@ test("模拟持仓计算总资产、持仓市值和浮动盈亏", () => {
   expect(frame).toContain("持仓市值")
   expect(frame).toContain("浮动盈亏")
   expect(frame).toContain("+¥1,000.00")
+  expect(frame).toContain("已实现盈亏")
+  expect(frame).toContain("¥0.00")
   expect(frame).toContain("累计收益")
   expect(frame).toContain("+0.83%")
   expect(frame).toContain("600519 贵州茅台 100股")

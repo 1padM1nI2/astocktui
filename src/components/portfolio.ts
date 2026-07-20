@@ -61,6 +61,7 @@ export class PortfolioWorkspace implements Component {
     const summary = calculatePortfolio(this.#snapshot)
     const profitColorCode = profitColor(summary.totalProfit)
     const unrealizedColorCode = profitColor(summary.unrealizedProfit)
+    const realizedColorCode = profitColor(summary.realizedProfit)
     const lines: string[] = [
       fitLine(`持仓 / 模拟账户 ${ANSI.brightBlack}[模拟]${ANSI.reset}`, safeWidth),
       "─".repeat(safeWidth),
@@ -70,6 +71,11 @@ export class PortfolioWorkspace implements Component {
       metricRow(
         "浮动盈亏",
         `${unrealizedColorCode}${formatMoney(summary.unrealizedProfit, true)}${ANSI.reset}`,
+        safeWidth,
+      ),
+      metricRow(
+        "已实现盈亏",
+        `${realizedColorCode}${formatMoney(summary.realizedProfit, true)}${ANSI.reset}`,
         safeWidth,
       ),
       metricRow(

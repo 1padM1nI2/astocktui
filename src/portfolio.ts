@@ -17,6 +17,7 @@ export interface PortfolioSummary {
   readonly marketValue: number
   readonly costBasis: number
   readonly unrealizedProfit: number
+  readonly realizedProfit: number
   readonly totalAssets: number
   readonly totalProfit: number
   readonly totalReturnPercent: number
@@ -45,12 +46,14 @@ export function calculatePortfolio(snapshot: PortfolioSnapshot): PortfolioSummar
   const unrealizedProfit = roundMoney(marketValue - costBasis)
   const totalAssets = roundMoney(snapshot.cash + marketValue)
   const totalProfit = roundMoney(totalAssets - snapshot.initialCapital)
+  const realizedProfit = roundMoney(totalProfit - unrealizedProfit)
   const totalReturnPercent =
     snapshot.initialCapital === 0 ? 0 : (totalProfit / snapshot.initialCapital) * 100
   return {
     marketValue,
     costBasis,
     unrealizedProfit,
+    realizedProfit,
     totalAssets,
     totalProfit,
     totalReturnPercent,

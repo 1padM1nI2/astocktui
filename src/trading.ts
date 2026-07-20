@@ -57,6 +57,10 @@ export class PaperTradingService {
     if (options.state !== undefined) this.#restore(options.state)
   }
 
+  get lotSize(): number {
+    return this.#lotSize
+  }
+
   get state(): PaperTradingState {
     return serializeTradingState(
       this.#initialCapital,
