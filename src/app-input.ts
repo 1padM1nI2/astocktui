@@ -35,6 +35,15 @@ export class AppInputHandler {
   handle(data: string): void {
     this.#lastActivityAt = Date.now()
     const options = this.#options
+    if (data.startsWith("\x1b[200~") && data.endsWith("\x1b[201~")) {
+      const text = data.slice("\x1b[200~".length, -"\x1b[201~".length)
+      options.setActiveTab(AGENT)
+      if (options.prompt.pasteText(text)) {
+        options.scroll.reset()
+        options.onUpdate()
+      }
+      return
+    }
     if (data === "\x03") {
       options.onQuit()
       return

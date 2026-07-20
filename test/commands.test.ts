@@ -204,6 +204,42 @@ describe("命令输入状态机", () => {
     expect(prompt.view.input).toBe("/focus portfolio")
   })
 
+  test("Shift+Enter 与 Alt+Enter 在提问输入中插入换行", () => {
+    const prompt = new CommandPrompt()
+    const context = commandContext()
+    const execute = (input: string) => executeCommand(input, context)
+    const submitted: string[] = []
+
+    prompt.handleInput("分", execute)
+    prompt.handleInput("\x1b[13;2u", execute)
+    prompt.handleInput("析", execute)
+    expect(prompt.view.input).toBe("分\n析")
+
+    prompt.handleInput("\x1b\r", execute)
+    expect(prompt.view.input).toBe("分\n析\n")
+
+    prompt.handleInput("\x7f", execute)
+    expect(prompt.view.input).toBe("分\n析")
+
+    prompt.handleInput(
+      "\r",
+      execute,
+      () => {},
+      (input) => submitted.push(input),
+    )
+    expect(submitted).toEqual(["分\n析"])
+  })
+
+  test("粘贴的普通文本保留换行，命令粘贴仍折叠为单行", () => {
+    const prompt = new CommandPrompt()
+    prompt.pasteText("第一行\r\n第二行\t第三列")
+    expect(prompt.view.input).toBe("第一行\n第二行 第三列")
+
+    const command = new CommandPrompt()
+    command.pasteText("/task list\n")
+    expect(command.view.input).toBe("/task list ")
+  })
+
   test("未知命令按 Enter 后显示错误而不是静默停留", () => {
     const prompt = new CommandPrompt()
     const context = commandContext()

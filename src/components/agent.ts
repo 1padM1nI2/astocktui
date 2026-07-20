@@ -1,5 +1,5 @@
 import type { Component } from "@oh-my-pi/pi-tui"
-import { visibleWidth } from "@oh-my-pi/pi-tui"
+import { visibleWidth, wrapTextWithAnsi } from "@oh-my-pi/pi-tui"
 import { EMPTY_AGENT_SESSION, renderAgentBody } from "../agent-body"
 import type { AgentSessionView } from "../agent-controller"
 import { ANSI } from "../colors"
@@ -9,6 +9,9 @@ import { fitLine } from "../width"
 import { renderFramedPanel } from "./framed-panel"
 
 const DEFAULT_HEIGHT = 15
+const MAX_INPUT_LINES = 3
+const INPUT_PROMPT = `${ANSI.cyan}>_${ANSI.reset} `
+const INPUT_PROMPT_WIDTH = 3
 
 function alignSides(left: string, right: string, width: number): string {
   const gap = width - visibleWidth(left) - visibleWidth(right)
@@ -16,12 +19,23 @@ function alignSides(left: string, right: string, width: number): string {
   return `${left}${" ".repeat(gap)}${right}`
 }
 
-function agentInputLine(input: string, cursor: string, right: string, width: number): string {
-  const prompt = `${ANSI.cyan}>_${ANSI.reset} `
-  const left = `${prompt}${input}${cursor}`
-  if (visibleWidth(left) + visibleWidth(right) < width) return alignSides(left, right, width)
-  const inputWidth = Math.max(0, width - visibleWidth(prompt) - visibleWidth(cursor))
-  return `${prompt}${fitLine(input, inputWidth)}${cursor}`
+function agentInputLines(input: string, cursor: string, right: string, width: number): string[] {
+  const contentWidth = Math.max(1, width - INPUT_PROMPT_WIDTH)
+  const wrapped = input.split("\n").flatMap((segment) => wrapTextWithAnsi(segment, contentWidth))
+  const truncated = wrapped.length > MAX_INPUT_LINES
+  const visible = truncated ? wrapped.slice(-MAX_INPUT_LINES) : wrapped
+  return visible.map((segment, index) => {
+    const prefix =
+      index === 0 && !truncated
+        ? INPUT_PROMPT
+        : index === 0
+          ? `${ANSI.brightBlack}…${ANSI.reset}  `
+          : "   "
+    let line = `${prefix}${segment}`
+    if (index === visible.length - 1) line += cursor
+    if (index === 0 && right.length > 0) return alignSides(fitLine(line, width), right, width)
+    return fitLine(line, width)
+  })
 }
 
 function agentStatusLabel(status: AgentSessionView["status"]): string {
@@ -75,7 +89,10 @@ export class AgentWorkspace implements Component {
     const inputCursor = this.#active ? `${ANSI.reverse} ${ANSI.reset}` : ""
     if (safeHeight === 0) return []
     if (safeHeight < 3 || safeWidth < 5) {
-      const compact = ["Agent / 上下文", agentInputLine(this.#input, inputCursor, "", safeWidth)]
+      const compact = [
+        "Agent / 上下文",
+        agentInputLines(this.#input, inputCursor, "", safeWidth)[0] ?? "",
+      ]
       return Array.from({ length: safeHeight }, (_, index) =>
         fitLine(compact[index] ?? "", safeWidth),
       )
@@ -83,8 +100,14 @@ export class AgentWorkspace implements Component {
 
     const contentHeight = safeHeight - 2
     const contentWidth = Math.max(1, safeWidth - 4)
-    const bodyCapacity = Math.max(0, contentHeight - 3)
     const paletteOpen = this.#commandView?.isPaletteOpen === true
+    const inputLines = agentInputLines(
+      this.#input,
+      inputCursor,
+      paletteOpen ? "" : `${ANSI.brightBlack}Enter 发送${ANSI.reset}`,
+      contentWidth,
+    )
+    const bodyCapacity = Math.max(0, contentHeight - 2 - inputLines.length)
     const statusColor = this.#active ? ANSI.cyan : ANSI.brightBlack
     let status = `${statusColor}● 就绪${ANSI.reset}`
     if (paletteOpen) {
@@ -125,14 +148,7 @@ export class AgentWorkspace implements Component {
           ? `${ANSI.brightBlack}↑↓ 滚动 · PgUp/PgDn 翻页 · Home/End 首尾${ANSI.reset}`
           : `${ANSI.brightBlack}${"─".repeat(contentWidth)}${ANSI.reset}`,
     )
-    lines.push(
-      agentInputLine(
-        this.#input,
-        inputCursor,
-        paletteOpen ? "" : `${ANSI.brightBlack}Enter 发送${ANSI.reset}`,
-        contentWidth,
-      ),
-    )
+    lines.push(...inputLines)
 
     return renderFramedPanel(title, lines, safeWidth, safeHeight, this.#active ? "accent" : "muted")
   }

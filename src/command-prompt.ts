@@ -1,3 +1,4 @@
+import { matchesKey } from "@oh-my-pi/pi-tui"
 import {
   type AppCommand,
   type CommandExecution,
@@ -34,6 +35,20 @@ export class CommandPrompt {
     return this.#pending ?? Promise.resolve()
   }
 
+  pasteText(text: string): boolean {
+    const preserveNewlines = !(this.#input + text).startsWith("/")
+    const normalized = (
+      preserveNewlines
+        ? text.replace(/\r\n?/g, "\n").replace(/\t/g, " ")
+        : text.replace(/[\r\n\t]+/g, " ")
+    ).normalize("NFC")
+    if (normalized.length === 0) return false
+    this.#input += normalized
+    this.#result = null
+    this.#selectedIndex = 0
+    return true
+  }
+
   #selectedIndex = 0
   openPalette(): void {
     this.#input = "/"
@@ -61,6 +76,16 @@ export class CommandPrompt {
   ): boolean {
     if (this.#input.startsWith("/")) return this.#handleCommandInput(data, execute, onUpdate)
     if (data === "\t") return false
+    if (
+      matchesKey(data, "shift+enter") ||
+      matchesKey(data, "alt+enter") ||
+      matchesKey(data, "ctrl+enter")
+    ) {
+      this.#result = null
+      this.#input += "\n"
+      this.#selectedIndex = 0
+      return true
+    }
     if (data === "\r" || data === "\n") {
       if (isBareCommand(this.#input)) {
         this.#startExecution(execute(this.#input), onUpdate)
