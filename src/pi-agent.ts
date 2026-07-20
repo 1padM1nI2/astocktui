@@ -1,10 +1,13 @@
-import { Agent, type AgentEvent, type AgentTool } from "@oh-my-pi/pi-agent-core"
+import { Agent, type AgentEvent, type AgentMessage, type AgentTool } from "@oh-my-pi/pi-agent-core"
 import { getEnvApiKey, getEnvApiKeyName } from "@oh-my-pi/pi-ai"
 import { type GeneratedProvider, getBundledModel } from "@oh-my-pi/pi-catalog"
 import { AgentController, type AgentDriver, type AgentDriverEvent } from "./agent-controller"
 import type { AgentExtensionRuntime } from "./agent-extensions"
+import { messagesToExchanges } from "./agent-history"
+import { AgentSessionStore } from "./agent-session-store"
 import { createAStockAgentTools } from "./agent-tools"
 import type { CommandContext } from "./commands"
+import { ToolCallLogger } from "./tool-call-log"
 
 const SYSTEM_PROMPT = [
   "你是 AStockTUI 内置的中文 A 股分析与模拟交易 Agent。所有资金、持仓和成交都属于本地模拟账户，绝不是真实券商订单。",
@@ -27,40 +30,71 @@ export interface PiAgentConfig {
 class PiAgentDriver implements AgentDriver {
   readonly #agent: Agent
   readonly #labels = new Map<string, string>()
+  readonly #promptExtras: () => readonly string[]
+  readonly #sessionStore: AgentSessionStore | undefined
+  #extensionSupplement: readonly string[] = []
   #emit: ((event: AgentDriverEvent) => void) | null = null
   #currentInput = ""
 
-  constructor(agent: Agent, labels: ReadonlyMap<string, string>) {
+  constructor(
+    agent: Agent,
+    labels: ReadonlyMap<string, string>,
+    promptExtras: () => readonly string[],
+    sessionStore?: AgentSessionStore,
+  ) {
     this.#agent = agent
+    this.#promptExtras = promptExtras
+    this.#sessionStore = sessionStore
     for (const [name, label] of labels) this.#labels.set(name, label)
     this.#agent.subscribe((event) => this.#handleEvent(event))
     this.#agent.beforeToolCall = ({ toolCall }) =>
       authorizeAgentTool(toolCall.name, this.#currentInput)
         ? undefined
         : { block: true, reason: "用户未明确授权当前请求执行该模拟账户操作" }
+    this.#agent.setSystemPrompt(this.#composePrompt())
   }
 
   setExtensions(baseTools: readonly AgentTool[], runtime: AgentExtensionRuntime): void {
     const tools = [...baseTools, ...runtime.getTools()]
     this.#agent.setTools(tools)
-    this.#agent.setSystemPrompt([...SYSTEM_PROMPT, ...runtime.getSystemPromptSupplement()])
+    this.#extensionSupplement = runtime.getSystemPromptSupplement()
+    this.#agent.setSystemPrompt(this.#composePrompt())
     this.#labels.clear()
     for (const tool of tools) this.#labels.set(tool.name, tool.label)
+  }
+
+  toolLabel(name: string): string {
+    return this.#labels.get(name) ?? name
   }
 
   async run(input: string, emit: (event: AgentDriverEvent) => void): Promise<void> {
     this.#emit = emit
     this.#currentInput = input
+    this.#agent.setSystemPrompt(this.#composePrompt())
     try {
       await this.#agent.prompt(input)
     } finally {
       this.#emit = null
       this.#currentInput = ""
+      this.#saveSession()
+    }
+  }
+
+  #composePrompt(): string[] {
+    return [...SYSTEM_PROMPT, ...this.#promptExtras(), ...this.#extensionSupplement]
+  }
+
+  #saveSession(): void {
+    try {
+      this.#sessionStore?.save(this.#agent.state.messages)
+    } catch {
+      // 会话持久化失败不影响对话
     }
   }
 
   clear(): void {
     this.#agent.clearMessages()
+    this.#saveSession()
   }
 
   abort(): void {
@@ -136,22 +170,50 @@ export function createPiAgentController(
     apiKeyName !== undefined && apiKey === undefined ? `未配置 ${apiKeyName}` : undefined
   const configuredApiKey = config.apiKey
   const tools = createAStockAgentTools(context)
+  const sessionStore = new AgentSessionStore()
+  const restoredMessages = sessionStore.load().state.messages
   const agent = new Agent({
     initialState: {
       systemPrompt: SYSTEM_PROMPT,
       model,
       tools: [...tools],
+      ...(restoredMessages.length === 0
+        ? {}
+        : { messages: [...restoredMessages] as AgentMessage[] }),
     },
     ...(configuredApiKey === undefined ? {} : { getApiKey: () => configuredApiKey }),
     hideThinkingSummary: true,
   })
-  const driver = new PiAgentDriver(agent, new Map(tools.map((tool) => [tool.name, tool.label])))
+  const toolCallLog = new ToolCallLogger()
+  agent.subscribe((event) => {
+    if (event.type === "tool_execution_start") {
+      toolCallLog.recordStart({ id: event.toolCallId, name: event.toolName, args: event.args })
+      return
+    }
+    if (event.type === "tool_execution_end") {
+      toolCallLog.recordEnd({
+        id: event.toolCallId,
+        name: event.toolName,
+        isError: event.isError === true,
+        result: event.result,
+      })
+    }
+  })
+  const driver = new PiAgentDriver(
+    agent,
+    new Map(tools.map((tool) => [tool.name, tool.label])),
+    () => context.memory?.().promptSupplement() ?? [],
+    sessionStore,
+  )
+  const restoredHistory = messagesToExchanges(restoredMessages as AgentMessage[], (name) =>
+    driver.toolLabel(name),
+  )
   if (extensions !== undefined) {
     const sync = () => driver.setExtensions(tools, extensions)
     extensions.subscribe(sync)
     sync()
   }
-  return new AgentController(driver, modelLabel, configurationError)
+  return new AgentController(driver, modelLabel, configurationError, restoredHistory)
 }
 
 export function withAgentBaseUrl<TModel extends { readonly baseUrl: string }>(

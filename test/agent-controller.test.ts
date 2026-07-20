@@ -110,6 +110,41 @@ describe("Pi Agent 会话控制器", () => {
     expect(driver.prompts).toEqual([])
   })
 
+  test("新一轮提问将上一轮问答归档到历史视图", async () => {
+    const driver = new FakeAgentDriver()
+    const controller = new AgentController(driver, "test/model")
+
+    await controller.prompt("第一问")
+    await controller.prompt("第二问")
+
+    expect(controller.view.userInput).toBe("第二问")
+    expect(controller.view.history).toEqual([
+      {
+        user: "第一问",
+        answer: "贵州茅台当前走势偏强。仍需关注成交量。",
+        tools: [
+          {
+            id: "tool-1",
+            name: "get_market_snapshot",
+            label: "读取实时行情",
+            status: "completed",
+            summary: "返回 4 只股票",
+          },
+        ],
+      },
+    ])
+  })
+
+  test("构造时恢复历史问答并在清理时一并清除", async () => {
+    const controller = new AgentController(new FakeAgentDriver(), "test/model", undefined, [
+      { user: "旧问题", answer: "旧回答", tools: [] },
+    ])
+    expect(controller.view.history).toEqual([{ user: "旧问题", answer: "旧回答", tools: [] }])
+
+    controller.clear()
+    expect(controller.view.history).toEqual([])
+  })
+
   test("清理会话同时清除 Pi 上下文和界面内容", async () => {
     const driver = new FakeAgentDriver()
     const controller = new AgentController(driver, "test/model")

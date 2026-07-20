@@ -1,4 +1,4 @@
-import type { AgentSessionView, AgentToolView } from "./agent-controller"
+import type { AgentExchangeView, AgentSessionView, AgentToolView } from "./agent-controller"
 import { renderAgentMarkdown } from "./agent-markdown"
 import { ANSI } from "./colors"
 import { fitLine } from "./width"
@@ -10,15 +10,17 @@ export const EMPTY_AGENT_SESSION: AgentSessionView = {
   answer: "",
   tools: [],
   error: null,
+  history: [],
 }
 
 export function renderAgentBody(view: AgentSessionView, width: number): readonly string[] {
   const safeWidth = Math.max(1, width | 0)
-  let lines: string[]
-  if (view.status === "unconfigured") lines = unconfiguredBody(view)
-  else if (view.userInput.length === 0) lines = waitingBody(view)
-  else lines = activeBody(view, safeWidth)
-  return lines
+  if (view.status === "unconfigured") return unconfiguredBody(view)
+  const lines: string[] = []
+  for (const exchange of view.history) appendExchange(lines, exchange, safeWidth)
+  if (view.userInput.length === 0) lines.push(...waitingBody(view))
+  else appendActiveExchange(lines, view, safeWidth)
+  return lines.map((line) => fitLine(line, safeWidth))
 }
 
 function unconfiguredBody(view: AgentSessionView): string[] {
@@ -42,8 +44,20 @@ function waitingBody(view: AgentSessionView): string[] {
   ]
 }
 
-function activeBody(view: AgentSessionView, width: number): string[] {
-  const lines = [`${ANSI.brightWhite}User${ANSI.reset} · ${view.userInput}`]
+function appendExchange(lines: string[], exchange: AgentExchangeView, width: number): void {
+  if (lines.length > 0) lines.push("")
+  appendUser(lines, exchange.user)
+  appendTools(lines, exchange.tools)
+  if (exchange.answer.length === 0) return
+  lines.push(`${ANSI.brightWhite}Assistant${ANSI.reset} · Pi Agent`)
+  for (const part of renderAgentMarkdown(exchange.answer, Math.max(1, width - 2), false)) {
+    lines.push(`  ${part}`)
+  }
+}
+
+function appendActiveExchange(lines: string[], view: AgentSessionView, width: number): void {
+  if (lines.length > 0) lines.push("")
+  appendUser(lines, view.userInput)
   appendTools(lines, view.tools)
   if (view.answer.length > 0) {
     lines.push(`${ANSI.brightWhite}Assistant${ANSI.reset} · Pi Agent`)
@@ -55,7 +69,12 @@ function activeBody(view: AgentSessionView, width: number): string[] {
     lines.push(`${ANSI.brightWhite}Assistant${ANSI.reset} · 正在分析…`)
   }
   if (view.error !== null) lines.push(`${ANSI.brightRed}错误 · ${view.error}${ANSI.reset}`)
-  return lines.map((line) => fitLine(line, width))
+}
+
+function appendUser(lines: string[], user: string): void {
+  const parts = user.split("\n")
+  lines.push(`${ANSI.brightWhite}User${ANSI.reset} · ${parts[0] ?? ""}`)
+  for (const part of parts.slice(1)) lines.push(`  ${part}`)
 }
 
 function appendTools(lines: string[], tools: readonly AgentToolView[]): void {

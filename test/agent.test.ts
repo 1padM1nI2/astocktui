@@ -73,6 +73,69 @@ describe("Agent 主聊天面板", () => {
     expectLinesFit(lines, 24)
   })
 
+  test("多行输入在输入区折行显示且光标停留在末行", () => {
+    const lines = new AgentWorkspace("第一段分析\n第二段结论", true).renderAtHeight(80, 15)
+    const frame = lines.join("\n")
+
+    expect(frame).toContain("第一段分析")
+    expect(frame).toContain("第二段结论")
+    const cursorLine = lines.find((line) => line.includes(`${ANSI.reverse} ${ANSI.reset}`)) ?? ""
+    expect(cursorLine).toContain("第二段结论")
+    expectLinesFit(lines, 80)
+  })
+
+  test("超过三行的输入只显示末尾并给出省略提示", () => {
+    const lines = new AgentWorkspace("行甲\n行乙\n行丙\n行丁\n行戊", true).renderAtHeight(40, 12)
+    const frame = lines.join("\n")
+
+    expect(frame).toContain("行戊")
+    expect(frame).not.toContain("行甲")
+    expect(frame).toContain("…")
+    expectLinesFit(lines, 40)
+  })
+
+  test("长单行输入自动折行且光标仍在末行", () => {
+    const lines = new AgentWorkspace("分析贵州茅台".repeat(10), true).renderAtHeight(60, 15)
+
+    expect(lines.join("\n")).toContain("分析贵州茅台")
+    expect(lines.at(-2)).toContain(ANSI.reverse)
+    expectLinesFit(lines, 60)
+  })
+
+  test("历史问答显示在当前对话上方", () => {
+    const view: AgentSessionView = {
+      status: "completed",
+      modelLabel: "test/model",
+      userInput: "现在的提问",
+      answer: "现在的回答",
+      tools: [],
+      error: null,
+      history: [
+        {
+          user: "上次的问题",
+          answer: "上次的回答",
+          tools: [
+            {
+              id: "t1",
+              name: "get_market_snapshot",
+              label: "实时行情",
+              status: "completed",
+              summary: "返回 4 只股票",
+            },
+          ],
+        },
+      ],
+    }
+    const frame = new AgentWorkspace("", true, undefined, view).renderAtHeight(100, 20).join("\n")
+
+    const oldIndex = frame.indexOf("上次的问题")
+    const newIndex = frame.indexOf("现在的提问")
+    expect(oldIndex).toBeGreaterThan(-1)
+    expect(newIndex).toBeGreaterThan(oldIndex)
+    expect(frame).toContain("上次的回答")
+    expect(frame).toContain("返回 4 只股票")
+  })
+
   test("提交后呈现角色、工具调用和综合回答层级", () => {
     const view: AgentSessionView = {
       status: "completed",
@@ -94,6 +157,7 @@ describe("Agent 主聊天面板", () => {
         },
       ],
       error: null,
+      history: [],
     }
     const frame = new AgentWorkspace("", true, undefined, view).renderAtHeight(100, 15).join("\n")
 
@@ -125,6 +189,7 @@ describe("Agent 主聊天面板", () => {
         "### 模拟交易\n\n- **预览买卖**：检查金额、费用和资金\n- `T+1` 校验\n\n请告诉我你的需求。",
       tools: [],
       error: null,
+      history: [],
     }
 
     const lines = new AgentWorkspace("", true, undefined, view).renderAtHeight(52, 20)
@@ -148,6 +213,7 @@ describe("Agent 主聊天面板", () => {
       answer: "- **执行模拟成交**：复用整手、印花税、佣金和 T+1 风控规则",
       tools: [],
       error: null,
+      history: [],
     }
 
     const lines = new AgentWorkspace("", true, undefined, view).renderAtHeight(32, 14)

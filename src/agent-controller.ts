@@ -14,6 +14,12 @@ export interface AgentToolView {
   readonly summary?: string
 }
 
+export interface AgentExchangeView {
+  readonly user: string
+  readonly answer: string
+  readonly tools: readonly AgentToolView[]
+}
+
 export interface AgentSessionView {
   readonly status: AgentSessionStatus
   readonly modelLabel: string
@@ -21,6 +27,7 @@ export interface AgentSessionView {
   readonly answer: string
   readonly tools: readonly AgentToolView[]
   readonly error: string | null
+  readonly history: readonly AgentExchangeView[]
 }
 
 export type AgentDriverEvent =
@@ -60,18 +67,28 @@ export class AgentController {
   readonly #configurationError: string | null
   readonly #listeners = new Set<() => void>()
   readonly #tools: MutableToolView[] = []
+  readonly #history: AgentExchangeView[]
   #status: AgentSessionStatus
   #userInput = ""
   #answer = ""
   #error: string | null
   #pending: Promise<void> | null = null
 
-  constructor(driver: AgentDriver, modelLabel: string, configurationError?: string) {
+  constructor(
+    driver: AgentDriver,
+    modelLabel: string,
+    configurationError?: string,
+    history: readonly AgentExchangeView[] = [],
+  ) {
     this.#driver = driver
     this.#modelLabel = modelLabel
     this.#configurationError = configurationError ?? null
     this.#status = configurationError === undefined ? "idle" : "unconfigured"
     this.#error = this.#configurationError
+    this.#history = history.map((exchange) => ({
+      ...exchange,
+      tools: exchange.tools.map((tool) => ({ ...tool })),
+    }))
   }
 
   get busy(): boolean {
@@ -86,6 +103,10 @@ export class AgentController {
       answer: this.#answer,
       tools: this.#tools.map((tool) => ({ ...tool })),
       error: this.#error,
+      history: this.#history.map((exchange) => ({
+        ...exchange,
+        tools: exchange.tools.map((tool) => ({ ...tool })),
+      })),
     }
   }
 
@@ -108,6 +129,7 @@ export class AgentController {
     }
 
     this.#status = "streaming"
+    this.#archiveExchange()
     this.#userInput = input
     this.#answer = ""
     this.#error = null
@@ -142,6 +164,7 @@ export class AgentController {
     this.#userInput = ""
     this.#answer = ""
     this.#tools.length = 0
+    this.#history.length = 0
     this.#status = this.#configurationError === null ? "idle" : "unconfigured"
     this.#error = this.#configurationError
     this.#notify()
@@ -149,6 +172,15 @@ export class AgentController {
 
   abort(): void {
     this.#driver.abort()
+  }
+
+  #archiveExchange(): void {
+    if (this.#userInput.length === 0) return
+    this.#history.push({
+      user: this.#userInput,
+      answer: this.#answer,
+      tools: this.#tools.map((tool) => ({ ...tool })),
+    })
   }
 
   #handleEvent(event: AgentDriverEvent): void {
