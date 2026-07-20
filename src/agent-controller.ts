@@ -74,6 +74,10 @@ export class AgentController {
     this.#error = this.#configurationError
   }
 
+  get busy(): boolean {
+    return this.#pending !== null
+  }
+
   get view(): AgentSessionView {
     return {
       status: this.#status,

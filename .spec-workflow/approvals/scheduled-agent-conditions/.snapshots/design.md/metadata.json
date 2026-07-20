@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/scheduled-agent-conditions/design.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-07-17T03:54:34.607Z",
+      "trigger": "initial",
+      "approvalId": "approval_1784260474599_x67bh1ed5",
+      "approvalTitle": "定时 Agent 与模拟盘条件单设计"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-07-17T03:57:01.762Z",
+      "trigger": "approved",
+      "approvalId": "approval_1784260474599_x67bh1ed5",
+      "approvalTitle": "定时 Agent 与模拟盘条件单设计"
+    }
+  ]
+}

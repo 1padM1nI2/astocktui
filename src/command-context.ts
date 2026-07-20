@@ -1,8 +1,12 @@
+import type { AgentTaskScheduler } from "./agent-scheduler"
 import type { CommandExecution } from "./commands"
+import type { ConditionalOrderService } from "./conditional-order-service"
 import type { MarketSnapshot } from "./market-data"
 import type { MarketOverviewSnapshot } from "./market-overview"
+import type { MemoryService } from "./memory-service"
 import type { FinancialNewsSnapshot } from "./news-data"
 import type { PortfolioSnapshot } from "./portfolio"
+import type { ScheduledTaskService } from "./scheduled-task-service"
 import type { PaperTradingService, TradeQuote } from "./trading"
 import type { WatchlistChange } from "./watchlist"
 
@@ -45,6 +49,10 @@ export interface CommandContext {
   portfolioChanged(): void
   watchlist(): readonly string[]
   changeWatchlist(action: "add" | "remove", code: string): Promise<WatchlistChange>
+  agentSchedule?(): AgentTaskScheduler
+  conditionalOrders?(): ConditionalOrderService
+  scheduledTasks?(): ScheduledTaskService
+  memory?(): MemoryService
   invokeSkill?(name: string, args: readonly string[]): CommandExecution
   mcpCommand?(args: readonly string[]): CommandExecution
 }

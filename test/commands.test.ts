@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { CommandPrompt } from "../src/command-prompt"
 import {
   APP_COMMANDS,
@@ -7,6 +10,8 @@ import {
   executeCommand,
   filterCommands,
 } from "../src/commands"
+import { ScheduledTaskService } from "../src/scheduled-task-service"
+import { ScheduledTaskStore } from "../src/scheduled-task-store"
 import { PaperTradingService } from "../src/trading"
 
 function commandContext(): CommandContext & {
@@ -81,6 +86,10 @@ describe("应用命令注册表", () => {
       "account",
       "mcp",
       "clear",
+      "schedule",
+      "condition",
+      "task",
+      "memory",
       "quit",
     ])
   })
@@ -121,6 +130,33 @@ describe("应用命令注册表", () => {
     executeCommand("/exit", context)
     expect(context.quitCalled).toBe(true)
   })
+})
+
+test("/task 创建并管理自定义定时任务", () => {
+  const directory = mkdtempSync(join(tmpdir(), "astocktui-task-commands-"))
+  try {
+    const context = commandContext()
+    const service = new ScheduledTaskService({
+      store: new ScheduledTaskStore(join(directory, "scheduled-tasks.json")),
+      sink: { enqueue: () => "queued" },
+      now: () => new Date("2026-07-17T01:00:00.000Z"),
+    })
+    context.scheduledTasks = () => service
+
+    expect(
+      executeSync("/task add daily 15:10 weekdays 收盘 复盘 :: 总结市场和持仓", context).lines.join(
+        "\n",
+      ),
+    ).toContain("收盘 复盘")
+    expect(executeSync("/task list", context).lines.join("\n")).toContain("每日工作日 15:10")
+    expect(executeSync("/task pause TASK-0001", context).lines.join("\n")).toContain("已暂停")
+    expect(executeSync("/task resume TASK-0001", context).lines.join("\n")).toContain("已恢复")
+    expect(executeSync("/task run TASK-0001", context).lines.join("\n")).toContain("已排队")
+    expect(executeSync("/task builtin", context).lines.join("\n")).toContain("盘前计划")
+    expect(executeSync("/task add interval 0 错误 :: 无效", context).title).toBe("命令错误")
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 describe("命令输入状态机", () => {

@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/custom-scheduled-tasks/design.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-07-18T01:58:47.827Z",
+      "trigger": "initial",
+      "approvalId": "approval_1784339927813_rnwt80rh7",
+      "approvalTitle": "批准自定义定时任务设计"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-07-18T02:10:29.902Z",
+      "trigger": "approved",
+      "approvalId": "approval_1784339927813_rnwt80rh7",
+      "approvalTitle": "批准自定义定时任务设计"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import type { AgentSessionView } from "./agent-controller"
 import type { CommandPromptView } from "./command-prompt"
 import type { WorkspaceName } from "./commands"
 import { AgentWorkspace } from "./components/agent"
+import type { ScheduledTaskSummary } from "./scheduled-task-service"
 import { fitLine } from "./width"
 import { renderWorkspacePanel, zipColumns } from "./workspace-layout"
 
@@ -29,6 +30,8 @@ export interface AppFrameState {
   readonly agent: AgentSessionView
   readonly agentScrollOffset: number
   readonly tradeHistory: Component
+  readonly memoryCount: number
+  readonly scheduledTasks: ScheduledTaskSummary
 }
 
 export function renderAppFrame(width: number, state: AppFrameState): readonly string[] {
@@ -86,6 +89,8 @@ function renderWide(
         state.prompt,
         state.agent,
         state.agentScrollOffset,
+        state.memoryCount,
+        state.scheduledTasks,
       ).renderAtHeight(agentWidth, agentHeight),
       width: agentWidth,
     },
@@ -108,5 +113,7 @@ function renderActive(width: number, height: number, state: AppFrameState): read
     state.prompt,
     state.agent,
     state.agentScrollOffset,
+    state.memoryCount,
+    state.scheduledTasks,
   ).renderAtHeight(width, height)
 }

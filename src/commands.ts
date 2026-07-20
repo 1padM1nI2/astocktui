@@ -1,6 +1,9 @@
+import { AUTOMATION_COMMANDS } from "./automation-commands"
 import { ANSI } from "./colors"
 import type { CommandContext, DataStatus, WorkspaceName } from "./command-context"
+import { MEMORY_COMMANDS } from "./memory-commands"
 import { calculatePortfolio } from "./portfolio"
+import { TASK_COMMANDS } from "./task-commands"
 import { TRADING_COMMANDS } from "./trading-commands"
 import { WATCHLIST_COMMANDS } from "./watchlist-commands"
 
@@ -208,6 +211,9 @@ export const APP_COMMANDS: readonly AppCommand[] = [
       return { kind: "clear", title: "", lines: [] }
     },
   },
+  ...AUTOMATION_COMMANDS,
+  ...TASK_COMMANDS,
+  ...MEMORY_COMMANDS,
   {
     name: "quit",
     aliases: ["q", "exit"],

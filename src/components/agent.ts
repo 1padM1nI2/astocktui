@@ -4,6 +4,7 @@ import { EMPTY_AGENT_SESSION, renderAgentBody } from "../agent-body"
 import type { AgentSessionView } from "../agent-controller"
 import { ANSI } from "../colors"
 import type { CommandPromptView } from "../command-prompt"
+import type { ScheduledTaskSummary } from "../scheduled-task-service"
 import { fitLine } from "../width"
 import { renderFramedPanel } from "./framed-panel"
 
@@ -38,6 +39,8 @@ export class AgentWorkspace implements Component {
   readonly #active: boolean
   readonly #commandView: CommandPromptView | undefined
   readonly #scrollOffset: number
+  readonly #memoryCount: number
+  readonly #scheduledTasks: ScheduledTaskSummary
 
   constructor(
     input: string,
@@ -45,12 +48,21 @@ export class AgentWorkspace implements Component {
     commandView?: CommandPromptView,
     agentView: AgentSessionView = EMPTY_AGENT_SESSION,
     scrollOffset = 0,
+    memoryCount = 0,
+    scheduledTasks: ScheduledTaskSummary = {
+      enabledCount: 0,
+      nextTask: null,
+      lastTask: null,
+      diagnostic: null,
+    },
   ) {
     this.#input = input
     this.#active = active
     this.#commandView = commandView
     this.#agentView = agentView
     this.#scrollOffset = Number.isFinite(scrollOffset) ? Math.max(0, Math.trunc(scrollOffset)) : 0
+    this.#memoryCount = Number.isFinite(memoryCount) ? Math.max(0, Math.trunc(memoryCount)) : 0
+    this.#scheduledTasks = scheduledTasks
   }
 
   render(width: number): readonly string[] {
@@ -86,8 +98,15 @@ export class AgentWorkspace implements Component {
     }
     const focusMarker = this.#active ? "◆ " : ""
     const title = alignSides(`${focusMarker}Agent / 上下文`, status, Math.max(0, safeWidth - 5))
+    let taskSummary = `任务 ${this.#scheduledTasks.enabledCount}`
+    if (this.#scheduledTasks.diagnostic !== null) taskSummary = "任务存储异常"
+    else if (this.#scheduledTasks.nextTask !== null)
+      taskSummary += ` · 下次 ${this.#scheduledTasks.nextTask.name}`
     const lines: string[] = [
-      `${ANSI.brightBlack}会话 1 · 模型 ${this.#agentView.modelLabel} · 上下文 行情 + 持仓 + 财经新闻${ANSI.reset}`,
+      fitLine(
+        `${ANSI.brightBlack}会话 1 · ${taskSummary} · 记忆 ${this.#memoryCount} 条 · 模型 ${this.#agentView.modelLabel} · 上下文 行情 + 持仓 + 财经新闻${ANSI.reset}`,
+        contentWidth,
+      ),
     ]
 
     const body = this.#activeBody(bodyCapacity, contentWidth)

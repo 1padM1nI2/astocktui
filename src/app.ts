@@ -1,10 +1,13 @@
 import type { Component } from "@oh-my-pi/pi-tui"
 import type { AgentController } from "./agent-controller"
+import { AgentEventDispatcher } from "./agent-event-dispatcher"
 import { AgentExtensionRuntime } from "./agent-extensions"
 import { AgentScrollState } from "./agent-scroll"
 import { AppInputHandler } from "./app-input"
+import { refreshAppData } from "./app-refresh"
 import { MARKET, renderAppFrame, WORKSPACE_INDEX, WORKSPACE_NAMES } from "./app-render"
 import { AutoRefreshController, type RefreshScheduler } from "./auto-refresh"
+import { AutomationRuntime } from "./automation-runtime"
 import { CommandPrompt } from "./command-prompt"
 import { type CommandContext, executeCommand, type RefreshReport } from "./commands"
 import { MarketWorkspace } from "./components/market"
@@ -14,12 +17,16 @@ import { TradeHistoryWorkspace } from "./components/trade-history"
 import { createDefaultMarketDataSource, type MarketDataSource } from "./market-data"
 import { type MarketOverviewDataSource, MarketOverviewService } from "./market-overview"
 import { PublicMarketOverviewDataSource } from "./market-overview-source"
+import { MemoryService } from "./memory-service"
 import type { NewsDataSource } from "./news-data"
 import { NewsNowDataSource } from "./news-data"
 import { createPiAgentController } from "./pi-agent"
 import { PaperTradingService } from "./trading"
+import { isContinuousAuction } from "./trading-calendar"
 import { WatchlistService } from "./watchlist"
 import { WatchlistCoordinator } from "./watchlist-coordinator"
+
+type AgentFactory = (context: CommandContext, extensions?: AgentExtensionRuntime) => AgentController
 
 export class MarketIntelligenceApp implements Component {
   onQuit: () => void = () => process.exit(0)
@@ -42,6 +49,9 @@ export class MarketIntelligenceApp implements Component {
   readonly #agentScroll: AgentScrollState
   readonly #extensions: AgentExtensionRuntime
   readonly #input: AppInputHandler
+  readonly #dispatcher: AgentEventDispatcher
+  readonly #automation: AutomationRuntime
+  readonly #memory = new MemoryService({ trades: () => this.#trading.trades })
 
   constructor(
     marketSource: MarketDataSource = createDefaultMarketDataSource(),
@@ -50,10 +60,7 @@ export class MarketIntelligenceApp implements Component {
     trading: PaperTradingService = new PaperTradingService(),
     refreshScheduler?: RefreshScheduler,
     watchlist: WatchlistService = new WatchlistService(),
-    agentFactory: (
-      context: CommandContext,
-      extensions?: AgentExtensionRuntime,
-    ) => AgentController = (context, extensions) =>
+    agentFactory: AgentFactory = (context, extensions) =>
       createPiAgentController(context, {}, extensions),
     marketOverviewSource: MarketOverviewDataSource = new PublicMarketOverviewDataSource(),
     extensionFactory: () => AgentExtensionRuntime = () => new AgentExtensionRuntime(),
@@ -81,6 +88,13 @@ export class MarketIntelligenceApp implements Component {
     this.#agentScroll = new AgentScrollState(viewportRows)
     this.#marketOverview = new MarketOverviewService(marketOverviewSource)
     this.#agent = agentFactory(this.#commandContext(), this.#extensions)
+    this.#dispatcher = new AgentEventDispatcher(this.#agent)
+    this.#automation = new AutomationRuntime({
+      sink: this.#dispatcher,
+      timer: refreshScheduler,
+      lastActivityAt: () => this.#input.lastActivityAt,
+      lotSize: this.#trading.lotSize,
+    })
     this.#input = new AppInputHandler({
       prompt: this.#prompt,
       scroll: this.#agentScroll,
@@ -108,11 +122,14 @@ export class MarketIntelligenceApp implements Component {
     this.#market.beginRefresh()
     this.onUpdate()
     const refresh = this.#marketSource
-      .loadSnapshot(this.#watchlist.codes)
+      .loadSnapshot([
+        ...new Set([...this.#watchlist.codes, ...this.#automation.conditions.activeCodes]),
+      ])
       .then((snapshot) => {
         this.#market.applySnapshot(snapshot)
         this.#trading.updatePrices(snapshot.quotes)
         this.#portfolio.applySnapshot(this.#trading.snapshot)
+        this.#automation.conditions.handleSnapshot(snapshot, isContinuousAuction(new Date()))
       })
       .catch(() => this.#market.failRefresh())
       .finally(() => {
@@ -142,12 +159,15 @@ export class MarketIntelligenceApp implements Component {
 
   startAutoRefresh(): void {
     this.#autoRefresh.start()
+    this.#automation.scheduler.start()
   }
   stopAutoRefresh(): void {
     this.#autoRefresh.stop()
+    this.#automation.scheduler.stop()
   }
   async dispose(): Promise<void> {
     this.stopAutoRefresh()
+    await this.#dispatcher.dispose()
     await this.#extensions.dispose()
   }
   waitForCommand(): Promise<void> {
@@ -179,7 +199,17 @@ export class MarketIntelligenceApp implements Component {
         if (refreshNews) void this.refreshNews()
         return { market, news }
       },
-      refreshAndWait: (target) => this.#refreshAndWait(target),
+      agentSchedule: () => this.#automation.scheduler,
+      conditionalOrders: () => this.#automation.conditions,
+      scheduledTasks: () => this.#automation.tasks,
+      memory: () => this.#memory,
+      refreshAndWait: (target) =>
+        refreshAppData(
+          target,
+          () => this.refreshMarket(),
+          () => this.#marketOverview.refresh(),
+          () => this.refreshNews(),
+        ),
       quit: () => this.onQuit(),
       clearAgent: () => this.#agent.clear(),
       status: () => ({
@@ -207,14 +237,6 @@ export class MarketIntelligenceApp implements Component {
     }
   }
 
-  async #refreshAndWait(target: "market" | "news" | "all"): Promise<void> {
-    await Promise.all([
-      target !== "news" ? this.refreshMarket() : undefined,
-      target !== "news" ? this.#marketOverview.refresh() : undefined,
-      target !== "market" ? this.refreshNews() : undefined,
-    ])
-  }
-
   render(width: number): readonly string[] {
     this.#agentScroll.recordRender(width)
     return renderAppFrame(width, {
@@ -227,6 +249,8 @@ export class MarketIntelligenceApp implements Component {
       agent: this.#agent.view,
       agentScrollOffset: this.#agentScroll.offset,
       tradeHistory: this.#tradeHistory,
+      memoryCount: this.#memory.count,
+      scheduledTasks: this.#automation.tasks.summary(),
     })
   }
 }

@@ -86,10 +86,10 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 - Keyboard: Up, Down, PageUp, PageDown.
 
 ### AgentWorkspace
-- Structure: bordered primary panel backed by `@oh-my-pi/pi-agent-core`, with streamed Markdown answers, live tool lifecycle rows, provider/model identity, bottom-anchored command suggestions, and a bottom-pinned prompt input.
+- Structure: bordered primary panel backed by `@oh-my-pi/pi-agent-core`, with streamed Markdown answers, live tool lifecycle rows, provider/model identity, bottom-anchored command suggestions, and a bottom-pinned prompt input. The subtitle line also shows the long-term memory entry count.
 - Markdown: Pi TUI parses headings, emphasis, inline/code blocks, links, quotes, rules, and ordered/unordered lists into ANSI terminal styles. Raw markers are removed, deep headings are flattened for compact panels, unordered bullets use `•`, and CJK-aware wrapping keeps every rendered line within the supplied width.
 - Configuration: `ASTOCK_AGENT_PROVIDER` and `ASTOCK_AGENT_MODEL` select any bundled Pi model; the default is `openai/gpt-4o-mini`. `ASTOCK_AGENT_BASE_URL` overrides the selected model endpoint, while OpenAI also accepts `OPENAI_BASE_URL`; only HTTP(S) endpoints are accepted. Provider credentials use Pi's standard environment variables such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GEMINI_API_KEY`. Missing credentials produce an explicit unconfigured state without issuing a request.
-- Tools: status, watchlist quotes, full-market overview, filtered multi-source financial news, portfolio, trade history, refresh, watchlist management, trade preview, simulated trade execution, simulated account reset, and workspace focus all use the same application services as keyboard commands.
+- Tools: status, watchlist quotes, full-market overview, filtered multi-source financial news, portfolio, trade history, refresh, watchlist management, trade preview, simulated trade execution, simulated account reset, long-term memory, and workspace focus all use the same application services as keyboard commands.
 - Trading safety: Agent orders only affect the persisted local paper account and retain lot, cash, fee, and T+1 checks. `execute_trade` is blocked unless the current user request explicitly authorizes trading or autonomous simulated operation; negative instructions win. Account reset additionally requires explicit reset wording and the tool's `RESET` confirmation.
 - States: unconfigured, waiting, streaming, tool-running, tool-complete, completed, error, command-running, and input-focus; provider and asynchronous command results replace pending states when complete.
 - Keyboard: Enter submits plain text to Pi Agent; `/` from any workspace focuses Agent and starts a fresh application command; Tab, Shift+Tab, Left, and Right move focus while the palette is closed; Ctrl+C exits.
@@ -97,7 +97,7 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 ### CommandPalette
 - Scope: application-local commands only; it never executes shell commands.
 - Registry: command metadata is the single source for parsing, filtering, completion, `/help`, and visible descriptions.
-- Commands: `/help`, `/status`, `/focus`, `/refresh`, `/watch`, `/portfolio`, `/preview`, `/buy`, `/sell`, `/trades`, `/account reset confirm`, `/clear`, `/quit`, and `/exit`.
+- Commands: `/help`, `/status`, `/focus`, `/refresh`, `/watch`, `/portfolio`, `/preview`, `/buy`, `/sell`, `/trades`, `/account reset confirm`, `/clear`, `/memory`, `/quit`, and `/exit`.
 - Keyboard: typing `/` from any workspace focuses Agent and opens the palette; Up and Down select; Tab completes; Enter executes an exact command; Esc closes the palette. Suggestions and keyboard help remain immediately above the prompt.
 - Plain text that does not start with `/` remains an Agent question, except the exact bare commands `quit` and `exit`, which exit the application.
 

@@ -1,6 +1,10 @@
 import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
 import type { CommandContext, RefreshTarget, WorkspaceName } from "./commands"
+import { createConditionAgentTools } from "./condition-agent-tools"
+import { createFileAgentTools } from "./file-agent-tools"
+import { createMemoryAgentTools } from "./memory-agent-tools"
+import { createScheduledTaskAgentTools } from "./task-agent-tools"
 import type { OrderQuantity, TradeQuote, TradeSide } from "./trading"
 
 function jsonResult(value: unknown): AgentToolResult<unknown> {
@@ -238,5 +242,9 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
         return jsonResult({ workspace: input.workspace })
       },
     },
+    ...createFileAgentTools(),
+    ...createConditionAgentTools(context),
+    ...createScheduledTaskAgentTools(context),
+    ...createMemoryAgentTools(context),
   ]
 }

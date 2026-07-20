@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/custom-scheduled-tasks/tasks.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-07-18T02:12:49.163Z",
+      "trigger": "initial",
+      "approvalId": "approval_1784340769157_edyedgcq3",
+      "approvalTitle": "批准自定义定时任务实施清单"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2026-07-18T02:13:08.437Z",
+      "trigger": "approved",
+      "approvalId": "approval_1784340769157_edyedgcq3",
+      "approvalTitle": "批准自定义定时任务实施清单"
+    }
+  ]
+}

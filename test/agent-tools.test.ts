@@ -1,10 +1,16 @@
 import { describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { AgentTool } from "@oh-my-pi/pi-agent-core"
+import { toolWireSchema } from "@oh-my-pi/pi-ai"
 import { createAStockAgentTools } from "../src/agent-tools"
 import type { CommandContext } from "../src/commands"
 import type { MarketSnapshot } from "../src/market-data"
 import type { MarketOverviewSnapshot } from "../src/market-overview"
 import type { FinancialNewsSnapshot } from "../src/news-data"
+import { ScheduledTaskService } from "../src/scheduled-task-service"
+import { ScheduledTaskStore } from "../src/scheduled-task-store"
 import { PaperTradingService } from "../src/trading"
 
 const QUOTE = {
@@ -110,6 +116,51 @@ function toolContext(): {
 }
 
 describe("AStock Pi Agent 工具", () => {
+  test("文件工具读取并编辑复盘记忆", async () => {
+    const tools = createAStockAgentTools(toolContext().context)
+    const dir = join(tmpdir(), `astocktui-agent-tools-${Date.now()}`)
+    mkdirSync(dir, { recursive: true })
+    const path = join(dir, "复盘记忆.md")
+    writeFileSync(path, "结论：白酒趋势偏强\n", "utf8")
+
+    globalThis.tool = {
+      read: async ({ path: target }) => {
+        const match = target.match(/^([A-Za-z]:[\\/][^:]*)/)
+        const filePath = match?.[1] ?? target.split(":")[0] ?? target
+        return readFileSync(filePath, "utf8")
+      },
+      edit: async ({ path: target, edits }) => {
+        const content = readFileSync(target, "utf8")
+        const first = edits[0]
+        if (first === undefined) throw new Error("缺少编辑内容")
+        writeFileSync(target, content.replace(first.old_text, first.new_text), "utf8")
+        return { ok: true }
+      },
+    }
+
+    expect(await runTool(tools, "read", { path })).toContain("白酒趋势偏强")
+    await runTool(tools, "edit", { path, old_text: "偏强", new_text: "转弱" })
+    expect(readFileSync(path, "utf8")).toContain("转弱")
+    globalThis.tool = undefined
+  })
+
+  test("独立终端没有宿主工具时仍能读取并编辑本地复盘文件", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "astocktui-local-file-tools-"))
+    try {
+      const path = join(directory, "复盘.md")
+      writeFileSync(path, "结论：仓位偏高\n", "utf8")
+      globalThis.tool = undefined
+      const tools = createAStockAgentTools(toolContext().context)
+
+      expect(await runTool(tools, "read", { path })).toContain("仓位偏高")
+      await runTool(tools, "edit", { path, old_text: "偏高", new_text: "合理" })
+      expect(readFileSync(path, "utf8")).toContain("仓位合理")
+    } finally {
+      globalThis.tool = undefined
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
   test("向 Agent 暴露全部行情、新闻、账户和控制接口", () => {
     const tools = createAStockAgentTools(toolContext().context)
     expect(tools.map((tool) => tool.name)).toEqual([
@@ -125,7 +176,145 @@ describe("AStock Pi Agent 工具", () => {
       "execute_trade",
       "reset_paper_account",
       "focus_workspace",
+      "read",
+      "write",
+      "edit",
+      "list",
+      "move",
+      "mkdir",
+      "delete",
+      "manage_condition_order",
+      "manage_scheduled_task",
+      "remember_memory",
+      "list_memories",
+      "forget_memory",
+      "replace_memories",
     ])
+  })
+
+  test("Agent 通过显式工具管理自定义定时任务", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "astocktui-task-agent-tools-"))
+    try {
+      const state = toolContext()
+      const service = new ScheduledTaskService({
+        store: new ScheduledTaskStore(join(directory, "scheduled-tasks.json")),
+        sink: { enqueue: () => "queued" },
+        now: () => new Date("2026-07-17T01:00:00.000Z"),
+      })
+      state.context.scheduledTasks = () => service
+      const tools = createAStockAgentTools(state.context)
+      expect(
+        await runTool(tools, "manage_scheduled_task", {
+          action: "create",
+          name: "午后检查",
+          prompt: "检查风险",
+          schedule: { kind: "interval", minutes: 15 },
+        }),
+      ).toMatchObject({ id: "TASK-0001", createdBy: "agent" })
+      expect(
+        await runTool(tools, "manage_scheduled_task", { action: "pause", id: "TASK-0001" }),
+      ).toMatchObject({ enabled: false })
+      expect(await runTool(tools, "manage_scheduled_task", { action: "list" })).toMatchObject({
+        total: 1,
+      })
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test("定时任务工具容忍缺省 weekdaysOnly 与未补零时间", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "astocktui-task-agent-tools-"))
+    try {
+      const state = toolContext()
+      const service = new ScheduledTaskService({
+        store: new ScheduledTaskStore(join(directory, "scheduled-tasks.json")),
+        sink: { enqueue: () => "queued" },
+        now: () => new Date("2026-07-17T01:00:00.000Z"),
+      })
+      state.context.scheduledTasks = () => service
+      const tools = createAStockAgentTools(state.context)
+      const tool = tools.find((candidate) => candidate.name === "manage_scheduled_task")
+      const schema = tool?.parameters as {
+        safeParse(input: unknown): { success: boolean }
+      }
+
+      expect(
+        schema.safeParse({
+          action: "create",
+          name: "盘前提醒",
+          prompt: "提示",
+          schedule: { kind: "daily", time: "09:30" },
+        }).success,
+      ).toBe(true)
+
+      const created = await runTool(tools, "manage_scheduled_task", {
+        action: "create",
+        name: "盘前提醒",
+        prompt: "提示",
+        schedule: { kind: "daily", time: "9:30" },
+      })
+      expect(created).toMatchObject({
+        id: "TASK-0001",
+        schedule: { kind: "daily", time: "09:30", weekdaysOnly: false },
+      })
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test("定时任务调度规则对模型呈现为扁平 schema", () => {
+    const tools = createAStockAgentTools(toolContext().context)
+    const tool = tools.find((candidate) => candidate.name === "manage_scheduled_task")
+    if (tool === undefined) throw new Error("工具不存在：manage_scheduled_task")
+    const wire = toolWireSchema(tool as never) as {
+      properties?: Record<string, Record<string, unknown> | undefined>
+    }
+    const schedule = wire.properties?.["schedule"]
+    expect(schedule?.["anyOf"]).toBeUndefined()
+    expect(schedule?.["type"]).toBe("object")
+    const kind = schedule?.["properties"] as Record<string, { enum?: string[] } | undefined>
+    expect(kind["kind"]?.enum).toEqual(["once", "daily", "interval"])
+  })
+
+  test("定时任务缺少调度字段时给出按类型的明确错误", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "astocktui-task-agent-tools-"))
+    try {
+      const state = toolContext()
+      const service = new ScheduledTaskService({
+        store: new ScheduledTaskStore(join(directory, "scheduled-tasks.json")),
+        sink: { enqueue: () => "queued" },
+        now: () => new Date("2026-07-17T01:00:00.000Z"),
+      })
+      state.context.scheduledTasks = () => service
+      const tools = createAStockAgentTools(state.context)
+
+      await expect(
+        runTool(tools, "manage_scheduled_task", {
+          action: "create",
+          name: "盘前提醒",
+          prompt: "提示",
+          schedule: { kind: "daily" },
+        }),
+      ).rejects.toThrow("每日任务需要 time")
+      await expect(
+        runTool(tools, "manage_scheduled_task", {
+          action: "create",
+          name: "提醒",
+          prompt: "提示",
+          schedule: { kind: "interval" },
+        }),
+      ).rejects.toThrow("间隔任务需要 minutes")
+      await expect(
+        runTool(tools, "manage_scheduled_task", {
+          action: "create",
+          name: "提醒",
+          prompt: "提示",
+          schedule: { kind: "once" },
+        }),
+      ).rejects.toThrow("一次性任务需要 at")
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 
   test("读取工具返回实时行情、新闻、账户和成交记录", async () => {

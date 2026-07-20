@@ -35,6 +35,37 @@ describe("Agent 主聊天面板", () => {
     expect(inactiveInput).not.toContain(ANSI.reverse)
   })
 
+  test("副标题展示长期记忆条数", () => {
+    const frame = new AgentWorkspace("", true, undefined, undefined, 0, 3)
+      .renderAtHeight(100, 15)
+      .join("\n")
+    expect(frame).toContain("记忆 3 条")
+
+    const empty = new AgentWorkspace("", true).renderAtHeight(100, 15).join("\n")
+    expect(empty).toContain("记忆 0 条")
+  })
+
+  test("副标题展示并截断自定义定时任务摘要", () => {
+    const lines = new AgentWorkspace("", true, undefined, undefined, 0, 0, {
+      enabledCount: 2,
+      nextTask: {
+        id: "TASK-0001",
+        name: "盘前风险检查任务名称很长",
+        prompt: "",
+        schedule: { kind: "interval", minutes: 5 },
+        createdBy: "user",
+        createdAt: "2026-07-17T01:00:00.000Z",
+        updatedAt: "2026-07-17T01:00:00.000Z",
+        enabled: true,
+        nextRunAt: "2026-07-17T01:05:00.000Z",
+      },
+      lastTask: null,
+      diagnostic: null,
+    }).renderAtHeight(32, 12)
+    expect(lines.join("\n")).toContain("任务 2")
+    expectLinesFit(lines, 32)
+  })
+
   test("窄 Agent 面板在长输入后仍保留可见光标", () => {
     const lines = new AgentWorkspace("分析贵州茅台".repeat(12), true).renderAtHeight(24, 10)
 
