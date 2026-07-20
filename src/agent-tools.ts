@@ -232,8 +232,10 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
     {
       name: "focus_workspace",
       label: "切换工作区",
-      description: "切换 TUI 焦点到行情、持仓、新闻或 Agent 工作区。",
-      parameters: z.object({ workspace: z.enum(["market", "portfolio", "news", "agent"]) }),
+      description: "切换 TUI 焦点到行情、持仓、新闻、Agent 或交易记录工作区。",
+      parameters: z.object({
+        workspace: z.enum(["market", "portfolio", "news", "agent", "trade"]),
+      }),
       intent: "omit",
       approval: "write",
       execute: async (_id, params) => {

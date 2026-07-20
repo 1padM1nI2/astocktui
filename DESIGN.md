@@ -53,6 +53,7 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 - Management: `/watch list`, `/watch add <code>`, and `/watch remove <code>` update the table immediately; added codes are normalized to `SH` or `SZ` and fetched without restarting.
 - Storage: watchlist order is atomically persisted as versioned JSON beside the paper account in `watchlist.json`; invalid files abort loading instead of silently replacing user selections.
 - Accessibility: every field has stable textual labels; color is supplemental to sign text.
+- Keyboard: Up, Down, PageUp, PageDown, Home, End scroll the watchlist when it overflows the panel.
 
 ### MarketOverviewService
 - Coverage: seven major A-share indices, market-wide rise/fall distribution, counts at or beyond ±10%, industry leaders and laggards, aggregated industry turnover, and top gaining/losing stocks.
@@ -64,6 +65,7 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 - Structure: simulated account summary, available cash, market value, unrealized profit, total return, and position rows.
 - States: empty, populated, profit, loss; the default account starts with ¥100,000 cash and no positions.
 - Scope: both manual commands and Pi Agent tools reuse the same paper-trading service and risk checks.
+- Keyboard: Up, Down, PageUp, PageDown, Home, End scroll summary and position rows when they overflow the panel.
 
 ### PaperTradingService
 - Execution: market-style simulated fills use the latest loaded quote; if a valid stock code is missing, the original command fetches that quote on demand and continues automatically without a second command.
@@ -74,9 +76,10 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 - Storage: versioned JSON is atomically replaced at `%LOCALAPPDATA%\\AStockTUI\\paper-account.json` on Windows, `$XDG_DATA_HOME/astocktui/paper-account.json` when configured, or `~/.astocktui/paper-account.json` as fallback. Invalid state aborts loading instead of silently resetting assets.
 
 ### TradeHistoryWorkspace
-- Structure: a read-only Agent sidecar showing persisted fills newest-first, with order ID, side, code, quantity, execution price, date, fees, and realized profit on sells.
+- Structure: a focusable read-only workspace (fifth tab, after Agent) showing persisted fills newest-first, with order ID, side, code, quantity, execution price, date, fees, and realized profit on sells.
 - States: empty, buy, profitable sell, losing sell; profit uses A-share red and loss uses green while signed values remain visible without color.
-- Responsive behavior: the sidecar appears to the right of Agent at `>= 160` columns; narrower terminals keep the focused workspace full-width and retain `/trades` for record lookup.
+- Responsive behavior: shown beside Agent at `>= 160` columns; narrower terminals show it full-width when focused and retain `/trades` for record lookup.
+- Keyboard: Up, Down, PageUp, PageDown, Home, End scroll the fill history when it overflows the panel.
 
 ### NewsWorkspace
 - Structure: scrolling timestamped headlines with source labels and optional source URLs.

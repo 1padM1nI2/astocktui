@@ -4,6 +4,7 @@ import { ANSI } from "../colors"
 import type { PaperTradingService } from "../trading"
 import type { SimulatedTrade } from "../trading-types"
 import { fitLine } from "../width"
+import { ListScrollState } from "../workspace-scroll"
 
 const MONEY_FORMATTER = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
@@ -46,9 +47,18 @@ function tradeDetails(trade: SimulatedTrade, width: number): string {
 
 export class TradeHistoryWorkspace implements Component {
   readonly #trading: Pick<PaperTradingService, "trades">
+  readonly #scroll = new ListScrollState()
 
   constructor(trading: Pick<PaperTradingService, "trades">) {
     this.#trading = trading
+  }
+
+  get scroll(): ListScrollState {
+    return this.#scroll
+  }
+
+  handleInput(data: string): boolean {
+    return this.#scroll.handleInput(data)
   }
 
   render(width: number): readonly string[] {

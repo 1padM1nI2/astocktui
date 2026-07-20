@@ -1,5 +1,5 @@
 import type { AgentScrollState } from "./agent-scroll"
-import { AGENT, MARKET, NEWS, TAB_COUNT } from "./app-render"
+import { AGENT, MARKET, NEWS, PORTFOLIO, TAB_COUNT, TRADE } from "./app-render"
 import type { CommandPrompt } from "./command-prompt"
 import type { CommandExecution } from "./commands"
 
@@ -13,6 +13,9 @@ export interface AppInputOptions {
   readonly refreshMarket: () => unknown
   readonly refreshNews: () => unknown
   readonly handleNewsInput: (data: string) => unknown
+  readonly handleMarketInput: (data: string) => boolean
+  readonly handlePortfolioInput: (data: string) => boolean
+  readonly handleTradeInput: (data: string) => boolean
   readonly onQuit: () => unknown
   readonly onUpdate: () => unknown
 }
@@ -74,6 +77,9 @@ export class AppInputHandler {
       options.setActiveTab((options.activeTab() - 1 + TAB_COUNT) % TAB_COUNT)
       return
     }
+    if (options.activeTab() === MARKET && options.handleMarketInput(data)) return
+    if (options.activeTab() === PORTFOLIO && options.handlePortfolioInput(data)) return
+    if (options.activeTab() === TRADE && options.handleTradeInput(data)) return
     if (options.activeTab() === NEWS) {
       options.handleNewsInput(data)
       return

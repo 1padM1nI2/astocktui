@@ -10,7 +10,7 @@ import type { ScheduledTaskService } from "./scheduled-task-service"
 import type { PaperTradingService, TradeQuote } from "./trading"
 import type { WatchlistChange } from "./watchlist"
 
-export type WorkspaceName = "market" | "portfolio" | "news" | "agent"
+export type WorkspaceName = "market" | "portfolio" | "news" | "agent" | "trade"
 export type RefreshTarget = "market" | "news" | "all"
 export type RefreshDisposition = "started" | "running" | "skipped"
 

@@ -108,7 +108,8 @@ describe("应用命令注册表", () => {
       "/refresh [market|news|all]",
     )
     expect(executeSync("/focus portfolio", context).title).toBe("切换工作区")
-    expect(context.focused).toEqual(["portfolio"])
+    expect(executeSync("/focus trade", context).title).toBe("切换工作区")
+    expect(context.focused).toEqual(["portfolio", "trade"])
     expect(executeSync("/refresh all", context).title).toBe("刷新数据")
     expect(context.refreshed).toEqual(["all"])
     expect(executeSync("/portfolio", context).lines.join("\n")).toContain("¥100,000.00")

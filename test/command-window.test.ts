@@ -567,6 +567,7 @@ test("命令窗口将全球股票加入自选并在刷新后显示跨市场行",
     await Promise.resolve()
     expect(requested).toContain("US:AAPL")
     app.handleInput("\t")
+    app.handleInput("\t")
     const frame = app.render(79).map(stripVTControlCharacters).join("\n")
     expect(frame).toContain("全球股票")
     expect(frame).toContain("US USD")

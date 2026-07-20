@@ -11,14 +11,22 @@ export const MARKET = 0
 export const PORTFOLIO = 1
 export const NEWS = 2
 export const AGENT = 3
-export const TAB_COUNT = 4
+export const TRADE = 4
+export const TAB_COUNT = 5
 export const WORKSPACE_INDEX: Readonly<Record<WorkspaceName, number>> = {
   market: MARKET,
   portfolio: PORTFOLIO,
   news: NEWS,
   agent: AGENT,
+  trade: TRADE,
 }
-export const WORKSPACE_NAMES: readonly WorkspaceName[] = ["market", "portfolio", "news", "agent"]
+export const WORKSPACE_NAMES: readonly WorkspaceName[] = [
+  "market",
+  "portfolio",
+  "news",
+  "agent",
+  "trade",
+]
 
 export interface AppFrameState {
   readonly activeTab: number
@@ -95,7 +103,12 @@ function renderWide(
       width: agentWidth,
     },
     {
-      lines: renderWorkspacePanel(state.tradeHistory, tradeHistoryWidth, agentHeight, false),
+      lines: renderWorkspacePanel(
+        state.tradeHistory,
+        tradeHistoryWidth,
+        agentHeight,
+        state.activeTab === TRADE,
+      ),
       width: tradeHistoryWidth,
     },
   ]
@@ -107,6 +120,8 @@ function renderActive(width: number, height: number, state: AppFrameState): read
   if (state.activeTab === PORTFOLIO)
     return renderWorkspacePanel(state.portfolio, width, height, true)
   if (state.activeTab === NEWS) return renderWorkspacePanel(state.news, width, height, true)
+  if (state.activeTab === TRADE)
+    return renderWorkspacePanel(state.tradeHistory, width, height, true)
   return new AgentWorkspace(
     state.prompt.input,
     true,

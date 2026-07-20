@@ -36,6 +36,7 @@ const WORKSPACE_LABELS: Readonly<Record<WorkspaceName, string>> = {
   portfolio: "持仓",
   news: "新闻",
   agent: "Agent",
+  trade: "交易记录",
 }
 
 function output(title: string, lines: readonly string[]): CommandResult {
@@ -106,9 +107,10 @@ function focusCommand(context: CommandContext, args: readonly string[]): Command
     workspace !== "market" &&
     workspace !== "portfolio" &&
     workspace !== "news" &&
-    workspace !== "agent"
+    workspace !== "agent" &&
+    workspace !== "trade"
   ) {
-    return error("工作区必须是 market、portfolio、news 或 agent", "/focus <workspace>")
+    return error("工作区必须是 market、portfolio、news、agent 或 trade", "/focus <workspace>")
   }
   context.focus(workspace)
   return output("切换工作区", [`已切换到 ${WORKSPACE_LABELS[workspace]}`])

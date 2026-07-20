@@ -205,6 +205,7 @@ describe("市场智能工作台", () => {
     app.handleInput("\r")
     const agentFrame = app.render(120)
     app.handleInput("\t")
+    app.handleInput("\t")
     const marketFrame = app.render(120)
 
     // Then
@@ -221,10 +222,11 @@ describe("Tab 导航", () => {
     if (frame.includes("涨跌幅")) return "行情"
     if (frame.includes("持仓 / 模拟账户")) return "持仓"
     if (frame.includes("实时新闻 / 财经")) return "新闻"
+    if (frame.includes("交易记录 / 最近成交")) return "交易记录"
     if (frame.includes(">_")) return "Agent"
     return "unknown"
   }
-  test("Tab 正序切换行情→持仓→新闻→Agent→行情", () => {
+  test("Tab 正序切换行情→持仓→新闻→Agent→交易记录→行情", () => {
     const app = new MarketIntelligenceApp()
     expect(activeWorkspace(app.render(79).join("\n"))).toBe("行情")
     app.handleInput("\t")
@@ -233,12 +235,16 @@ describe("Tab 导航", () => {
     expect(activeWorkspace(app.render(79).join("\n"))).toBe("新闻")
     app.handleInput("\t")
     expect(activeWorkspace(app.render(79).join("\n"))).toBe("Agent")
+    app.handleInput("\t")
+    expect(activeWorkspace(app.render(79).join("\n"))).toBe("交易记录")
     app.handleInput("\t")
     expect(activeWorkspace(app.render(79).join("\n"))).toBe("行情")
   })
 
-  test("Shift+Tab 逆序切换行情→Agent→新闻→持仓→行情", () => {
+  test("Shift+Tab 逆序切换行情→交易记录→Agent→新闻→持仓→行情", () => {
     const app = new MarketIntelligenceApp()
+    app.handleInput("\x1b[Z")
+    expect(activeWorkspace(app.render(79).join("\n"))).toBe("交易记录")
     app.handleInput("\x1b[Z")
     expect(activeWorkspace(app.render(79).join("\n"))).toBe("Agent")
     app.handleInput("\x1b[Z")
@@ -247,6 +253,16 @@ describe("Tab 导航", () => {
     expect(activeWorkspace(app.render(79).join("\n"))).toBe("持仓")
     app.handleInput("\x1b[Z")
     expect(activeWorkspace(app.render(79).join("\n"))).toBe("行情")
+  })
+
+  test("宽屏下交易记录面板随 Tab 获得焦点高亮", () => {
+    const app = new MarketIntelligenceApp(undefined, undefined, () => 30)
+    for (let index = 0; index < 4; index++) app.handleInput("\t")
+
+    const frame = app.render(160)
+    const bottom = frame.find((line) => line.includes("交易记录 / 最近成交")) ?? ""
+    expect(bottom).toContain("◆ 交易记录 / 最近成交")
+    expect(bottom).not.toContain("◆ Agent / 上下文")
   })
 
   test("Left 和 Right 方向键切换标签页", () => {

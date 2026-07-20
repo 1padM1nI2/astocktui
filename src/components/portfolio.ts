@@ -4,6 +4,7 @@ import { ANSI } from "../colors"
 import type { PortfolioSnapshot } from "../portfolio"
 import { calculatePortfolio, EMPTY_PORTFOLIO } from "../portfolio"
 import { alignCell, fitLine } from "../width"
+import { ListScrollState } from "../workspace-scroll"
 
 const MONEY_FORMATTER = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
@@ -44,10 +45,20 @@ function alignSides(left: string, right: string, width: number): string {
 
 export class PortfolioWorkspace implements Component {
   #snapshot: PortfolioSnapshot
+  readonly #scroll = new ListScrollState()
 
   constructor(snapshot: PortfolioSnapshot = EMPTY_PORTFOLIO) {
     this.#snapshot = snapshot
   }
+
+  get scroll(): ListScrollState {
+    return this.#scroll
+  }
+
+  handleInput(data: string): boolean {
+    return this.#scroll.handleInput(data)
+  }
+
   get snapshot(): PortfolioSnapshot {
     return this.#snapshot
   }

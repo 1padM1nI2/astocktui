@@ -432,6 +432,7 @@ describe("AStock Pi Agent 工具", () => {
     await runTool(tools, "refresh_data", { target: "all" })
     await runTool(tools, "manage_watchlist", { action: "add", code: "SZ000938" })
     await runTool(tools, "focus_workspace", { workspace: "portfolio" })
+    await runTool(tools, "focus_workspace", { workspace: "trade" })
     await expect(runTool(tools, "reset_paper_account", { confirmation: "NO" })).rejects.toThrow(
       "RESET",
     )
@@ -439,7 +440,7 @@ describe("AStock Pi Agent 工具", () => {
 
     expect(state.refreshed).toEqual(["all"])
     expect(state.watchlist).toContain("SZ000938")
-    expect(state.focused).toEqual(["portfolio"])
+    expect(state.focused).toEqual(["portfolio", "trade"])
     expect(state.trading.snapshot.positions).toEqual([])
   })
 })

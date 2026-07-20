@@ -3,6 +3,7 @@ import { ANSI } from "../colors"
 import type { MarketQuote, MarketSnapshot } from "../market-data"
 import { DEFAULT_WATCHLIST, DEFAULT_WATCHLIST_CODES } from "../market-data"
 import { alignCell, fitLine } from "../width"
+import { ListScrollState } from "../workspace-scroll"
 
 const DEFAULT_NAMES = new Map(DEFAULT_WATCHLIST.map((item) => [item.code, item.name]))
 
@@ -114,9 +115,18 @@ export class MarketWorkspace implements Component {
   #status: "idle" | "loading" | "ready" | "error" = "idle"
   #quotesByCode: Readonly<Record<string, MarketQuote>> = {}
   #watchlistCodes: readonly string[]
+  readonly #scroll = new ListScrollState()
 
   constructor(codes: readonly string[] = DEFAULT_WATCHLIST_CODES) {
     this.#watchlistCodes = [...codes]
+  }
+
+  get scroll(): ListScrollState {
+    return this.#scroll
+  }
+
+  handleInput(data: string): boolean {
+    return this.#scroll.handleInput(data)
   }
 
   setWatchlist(codes: readonly string[]): void {

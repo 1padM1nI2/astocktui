@@ -2,6 +2,7 @@ import type { Component } from "@oh-my-pi/pi-tui"
 import { ANSI } from "../colors"
 import type { FinancialNewsSnapshot } from "../news-data"
 import { fitLine } from "../width"
+import { ListScrollState } from "../workspace-scroll"
 
 interface DisplayHeadline {
   readonly time: string
@@ -22,6 +23,12 @@ export class NewsWorkspace implements Component {
   #selected = -1
   #source = "NewsNow"
   #status: "idle" | "loading" | "ready" | "error" = "idle"
+  readonly #scroll = new ListScrollState()
+
+  get scroll(): ListScrollState {
+    return this.#scroll
+  }
+
   get status(): "idle" | "loading" | "ready" | "error" {
     return this.#status
   }
@@ -46,6 +53,7 @@ export class NewsWorkspace implements Component {
       title: item.title,
     }))
     this.#selected = Math.min(this.#selected, this.#headlines.length - 1)
+    this.#scroll.ensureVisible(this.#selected)
     this.#source = snapshot.source
     this.#status = "ready"
   }
@@ -56,21 +64,19 @@ export class NewsWorkspace implements Component {
 
   handleInput(data: string): void {
     const max = this.#headlines.length - 1
+    const page = Math.max(1, this.#scroll.viewportRows)
     if (data === "\x1b[B") {
       this.#selected = Math.min(this.#selected + 1, max)
-      return
-    }
-    if (data === "\x1b[A") {
+    } else if (data === "\x1b[A") {
       this.#selected = Math.max(this.#selected - 1, -1)
+    } else if (data === "\x1b[6~") {
+      this.#selected = Math.min(this.#selected + page, max)
+    } else if (data === "\x1b[5~") {
+      this.#selected = Math.max(this.#selected - page, -1)
+    } else {
       return
     }
-    if (data === "\x1b[6~") {
-      this.#selected = Math.min(this.#selected + 3, max)
-      return
-    }
-    if (data === "\x1b[5~") {
-      this.#selected = Math.max(this.#selected - 3, -1)
-    }
+    this.#scroll.ensureVisible(this.#selected)
   }
 
   render(width: number): readonly string[] {

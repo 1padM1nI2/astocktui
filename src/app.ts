@@ -108,6 +108,9 @@ export class MarketIntelligenceApp implements Component {
       refreshMarket: () => void this.refreshMarket(),
       refreshNews: () => void this.refreshNews(),
       handleNewsInput: (input) => this.#news.handleInput(input),
+      handleMarketInput: (input) => this.#market.handleInput(input),
+      handlePortfolioInput: (input) => this.#portfolio.handleInput(input),
+      handleTradeInput: (input) => this.#tradeHistory.handleInput(input),
       onQuit: () => this.onQuit(),
       onUpdate: () => this.onUpdate(),
     })
