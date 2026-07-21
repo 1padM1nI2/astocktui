@@ -30,6 +30,7 @@ export interface MarketQuote {
   readonly market?: StockMarket
   readonly currency?: string
   readonly marketState?: "open" | "closed" | "delayed" | "unknown"
+  readonly volume?: number
   readonly asOf?: number | null
 }
 
@@ -58,6 +59,7 @@ export interface StockApiQuote {
   readonly low: number
   readonly high: number
   readonly yesterday: number
+  readonly volume?: number
   readonly source?: string
 }
 
@@ -128,6 +130,7 @@ export class StockApiMarketDataSource implements MarketDataSource {
         price: quote.now,
         changePercent: Math.round(quote.percent * 1_000_000) / 10_000,
         source,
+        ...(typeof quote.volume === "number" && quote.volume > 0 ? { volume: quote.volume } : {}),
       })
       if (snapshotSource.length === 0) snapshotSource = source
       else if (snapshotSource !== source) snapshotSource = "多源"

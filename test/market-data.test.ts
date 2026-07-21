@@ -41,6 +41,7 @@ describe("stock-api 行情适配", () => {
             low: 1460,
             high: 1499,
             yesterday: 1471.08,
+            volume: 12_345,
             source: "tencent",
           },
           {
@@ -76,6 +77,7 @@ describe("stock-api 行情适配", () => {
           price: 1488.88,
           changePercent: 1.21,
           source: "tencent",
+          volume: 12_345,
         },
         {
           code: "SZ000858",

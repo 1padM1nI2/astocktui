@@ -51,6 +51,13 @@ export function isContinuousAuction(now: Date): boolean {
   return (minutes >= 570 && minutes < 690) || (minutes >= 780 && minutes < 900)
 }
 
+export function continuousAuctionElapsedMinutes(now: Date): number {
+  const { minutes } = shanghaiDateTime(now)
+  const morning = Math.min(Math.max(minutes - 570, 0), 120)
+  const afternoon = Math.min(Math.max(minutes - 780, 0), 120)
+  return morning + afternoon
+}
+
 export function parseShanghaiTimeMinutes(value: string): number | null {
   const match = /^(\d{2}):(\d{2})$/.exec(value)
   if (match === null) return null

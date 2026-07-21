@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import {
+  continuousAuctionElapsedMinutes,
   isAshareWeekday,
   isContinuousAuction,
   parseShanghaiTimeMinutes,
@@ -33,5 +34,15 @@ describe("A 股交易时段", () => {
     expect(parseShanghaiTimeMinutes("08:45")).toBe(525)
     expect(parseShanghaiTimeMinutes("24:00")).toBeNull()
     expect(parseShanghaiTimeMinutes("8:45")).toBeNull()
+  })
+
+  test("连续竞价已交易分钟数按上下午累计", () => {
+    expect(continuousAuctionElapsedMinutes(at("2026-07-20T01:30:00.000Z"))).toBe(0) // 09:30
+    expect(continuousAuctionElapsedMinutes(at("2026-07-20T02:30:00.000Z"))).toBe(60) // 10:30
+    expect(continuousAuctionElapsedMinutes(at("2026-07-20T03:30:00.000Z"))).toBe(120) // 11:30
+    expect(continuousAuctionElapsedMinutes(at("2026-07-20T04:30:00.000Z"))).toBe(120) // 12:30 午休
+    expect(continuousAuctionElapsedMinutes(at("2026-07-20T06:00:00.000Z"))).toBe(180) // 14:00
+    expect(continuousAuctionElapsedMinutes(at("2026-07-20T07:00:00.000Z"))).toBe(240) // 15:00
+    expect(continuousAuctionElapsedMinutes(at("2026-07-20T08:00:00.000Z"))).toBe(240) // 16:00 收盘后
   })
 })

@@ -7,13 +7,16 @@ import {
   validateConditionalOrder,
 } from "./conditional-orders"
 import type { MarketSnapshot } from "./market-data"
+import { shanghaiDateTime } from "./trading-calendar"
+
+export type VolumeBaselineFetcher = (code: string) => Promise<number | null>
 
 export interface CreateConditionalOrderInput {
   readonly code: string
   readonly name: string
   readonly condition: ConditionalOrder["condition"]
   readonly action: ConditionalOrderAction
-  readonly expiresAt: string
+  readonly expiresAt?: string
   readonly triggerPolicy?: "once" | "repeat"
   readonly cooldownMinutes?: number
 }
@@ -23,6 +26,8 @@ export class ConditionalOrderService {
   readonly #lotSize: number
   readonly #now: () => Date
   readonly #store: ConditionalOrderStore | undefined
+  readonly #volumeBaseline: VolumeBaselineFetcher | undefined
+  readonly #pending = new Set<Promise<void>>()
   #orders: ConditionalOrder[] = []
   #sequence = 0
   constructor(options: {
@@ -30,11 +35,13 @@ export class ConditionalOrderService {
     lotSize: number
     now?: () => Date
     store?: ConditionalOrderStore | undefined
+    volumeBaseline?: VolumeBaselineFetcher | undefined
   }) {
     this.#sink = options.sink
     this.#lotSize = options.lotSize
     this.#now = options.now ?? (() => new Date())
     this.#store = options.store
+    this.#volumeBaseline = options.volumeBaseline
     const loaded = this.#store?.load().state
     this.#orders = [...(loaded?.orders ?? [])]
     this.#sequence = loaded?.sequence ?? 0
@@ -49,10 +56,12 @@ export class ConditionalOrderService {
     const invalid = validateConditionalOrder(input.code, input.action, this.#lotSize)
     if (invalid !== null) throw new Error(invalid)
     const now = this.#now()
-    if (!Number.isFinite(new Date(input.expiresAt).getTime()) || new Date(input.expiresAt) <= now)
+    const expiresAt = input.expiresAt ?? new Date(now.getTime() + 24 * 3_600_000).toISOString()
+    if (!Number.isFinite(new Date(expiresAt).getTime()) || new Date(expiresAt) <= now)
       throw new Error("有效期必须晚于当前时间")
     const order: ConditionalOrder = {
       ...input,
+      expiresAt,
       id: `condition-${++this.#sequence}`,
       createdAt: now.toISOString(),
       status: "enabled",
@@ -82,6 +91,7 @@ export class ConditionalOrderService {
     )
     this.#orders = [...result.orders]
     this.#save()
+    this.#refreshVolumeBaselines(now)
     for (const trigger of result.triggers) {
       const order = this.#orders.find((candidate) => candidate.id === trigger.id)
       if (order !== undefined)
@@ -94,6 +104,39 @@ export class ConditionalOrderService {
         })
     }
   }
+  async whenIdle(): Promise<void> {
+    await Promise.all([...this.#pending])
+  }
+
+  #refreshVolumeBaselines(now: Date): void {
+    const fetcher = this.#volumeBaseline
+    if (fetcher === undefined) return
+    const today = shanghaiDateTime(now).date
+    for (const order of this.#orders) {
+      if (
+        order.status !== "enabled" ||
+        order.condition.type !== "volume-ratio" ||
+        order.avgVolumeDate === today
+      )
+        continue
+      const task = fetcher(order.code)
+        .then((avgVolume) => {
+          if (avgVolume === null || avgVolume <= 0) return
+          this.#orders = this.#orders.map((candidate) =>
+            candidate.id === order.id && candidate.status === "enabled"
+              ? { ...candidate, avgVolume, avgVolumeDate: today }
+              : candidate,
+          )
+          this.#save()
+        })
+        .catch(() => {})
+        .finally(() => {
+          this.#pending.delete(task)
+        })
+      this.#pending.add(task)
+    }
+  }
+
   #set(id: string, status: ConditionalOrder["status"]): ConditionalOrder {
     const order = this.#orders.find((candidate) => candidate.id === id)
     if (order === undefined) throw new Error(`条件单不存在：${id}`)
