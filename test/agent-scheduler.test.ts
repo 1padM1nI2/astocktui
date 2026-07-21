@@ -138,3 +138,39 @@ test("全局调度启用时调用用户任务 tick，停用后不再调用", () 
   expect(ticks).toEqual([new Date("2026-07-20T00:45:00.000Z")])
   scheduler.stop()
 })
+
+test("盘前触发日期持久化，重启后当天不再触发", () => {
+  now = new Date("2026-07-20T00:50:00.000Z") // 周一 08:50（上海），非连续竞价
+  const persisted: { preopenDate: string | null } = { preopenDate: null }
+  const store = {
+    loadPreopenDate: () => persisted.preopenDate,
+    savePreopenDate: (date: string) => {
+      persisted.preopenDate = date
+    },
+  }
+  const makeScheduler = (events: string[]) =>
+    new AgentTaskScheduler({
+      now: () => now,
+      timer,
+      store,
+      sink: {
+        enqueue: (event) => {
+          events.push(event.kind)
+          return "queued"
+        },
+      },
+    })
+
+  const firstRun: string[] = []
+  const schedulerA = makeScheduler(firstRun)
+  schedulerA.start()
+  expect(firstRun).toEqual(["preopen"])
+  expect(persisted.preopenDate).toBe("2026-07-20")
+  schedulerA.stop()
+
+  const secondRun: string[] = []
+  const schedulerB = makeScheduler(secondRun)
+  schedulerB.start()
+  expect(secondRun).toEqual([])
+  schedulerB.stop()
+})

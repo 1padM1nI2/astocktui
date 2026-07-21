@@ -63,6 +63,11 @@ const DEFAULT_TIMER: AutomationTimer = {
   },
 }
 
+export interface AgentSchedulerStateStore {
+  loadPreopenDate(): string | null
+  savePreopenDate(date: string): void
+}
+
 export interface AgentTaskSchedulerOptions {
   readonly sink: AgentEventSink
   readonly now?: () => Date
@@ -70,6 +75,7 @@ export interface AgentTaskSchedulerOptions {
   readonly settings?: Partial<AgentAutomationSettings>
   readonly lastActivityAt?: () => number
   readonly tasks?: ScheduledTaskTicker
+  readonly store?: AgentSchedulerStateStore
 }
 
 export class AgentTaskScheduler {
@@ -78,6 +84,7 @@ export class AgentTaskScheduler {
   readonly #timer: AutomationTimer
   readonly #lastActivityAt: () => number
   readonly #tasks: ScheduledTaskTicker | undefined
+  readonly #store: AgentSchedulerStateStore | undefined
   #settings: AgentAutomationSettings
   #handle: unknown
   #preopenDate: string | null = null
@@ -90,6 +97,8 @@ export class AgentTaskScheduler {
     this.#timer = options.timer ?? DEFAULT_TIMER
     this.#lastActivityAt = options.lastActivityAt ?? (() => Number.POSITIVE_INFINITY)
     this.#tasks = options.tasks
+    this.#store = options.store
+    this.#preopenDate = options.store?.loadPreopenDate() ?? null
     this.#settings = { ...DEFAULT_SETTINGS, ...options.settings }
   }
 
@@ -128,6 +137,7 @@ export class AgentTaskScheduler {
         this.#preopenDate !== time.date
       ) {
         this.#preopenDate = time.date
+        this.#store?.savePreopenDate(time.date)
         this.#emit("preopen", now)
       }
       const interval = this.#settings.intradayIntervalMinutes * 60_000

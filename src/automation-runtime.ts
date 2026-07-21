@@ -1,4 +1,5 @@
 import { type AgentEventSink, AgentTaskScheduler, type AutomationTimer } from "./agent-scheduler"
+import { AgentSchedulerStore } from "./agent-scheduler-store"
 import { ConditionalOrderService } from "./conditional-order-service"
 import { ConditionalOrderStore } from "./conditional-order-store"
 import { createScheduledTaskService } from "./scheduled-task-runtime"
@@ -28,6 +29,7 @@ export class AutomationRuntime {
       timer: options.timer,
       lastActivityAt: options.lastActivityAt,
       tasks: this.tasks,
+      store: new AgentSchedulerStore(),
     })
   }
 }
