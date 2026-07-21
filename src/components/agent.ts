@@ -38,6 +38,12 @@ function agentInputLines(input: string, cursor: string, right: string, width: nu
   })
 }
 
+function ruleWithLabel(label: string, width: number): string {
+  const prefix = `─ ${label} `
+  const fill = Math.max(0, width - visibleWidth(prefix))
+  return `${ANSI.brightBlack}${prefix}${"─".repeat(fill)}${ANSI.reset}`
+}
+
 function agentStatusLabel(status: AgentSessionView["status"]): string {
   if (status === "unconfigured") return "未配置"
   if (status === "streaming") return "分析中"
@@ -145,7 +151,7 @@ export class AgentWorkspace implements Component {
       paletteOpen
         ? `${ANSI.brightBlack}↑↓ 选择 · Tab 补全 · Esc 关闭${ANSI.reset}`
         : body.length > bodyCapacity
-          ? `${ANSI.brightBlack}↑↓ 滚动 · PgUp/PgDn 翻页 · Home/End 首尾${ANSI.reset}`
+          ? ruleWithLabel("↑↓ 滚动 · PgUp/PgDn 翻页 · Home/End 首尾", contentWidth)
           : `${ANSI.brightBlack}${"─".repeat(contentWidth)}${ANSI.reset}`,
     )
     lines.push(...inputLines)

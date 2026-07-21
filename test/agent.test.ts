@@ -102,6 +102,28 @@ describe("Agent 主聊天面板", () => {
     expectLinesFit(lines, 60)
   })
 
+  test("正文溢出时输入框上方仍为内嵌滚动提示的分隔线", () => {
+    const view: AgentSessionView = {
+      status: "completed",
+      modelLabel: "test/model",
+      userInput: "当前问题",
+      answer: "",
+      tools: [],
+      error: null,
+      history: [
+        { user: "问题一", answer: "回答一", tools: [] },
+        { user: "问题二", answer: "回答二", tools: [] },
+      ],
+    }
+    const lines = new AgentWorkspace("", true, undefined, view).renderAtHeight(80, 12)
+    const inputIndex = lines.findIndex((line) => line.includes(">_"))
+    const above = stripVTControlCharacters(lines[inputIndex - 1] ?? "")
+
+    expect(above).toContain("─")
+    expect(above).toContain("↑↓ 滚动 · PgUp/PgDn 翻页 · Home/End 首尾")
+    expectLinesFit(lines, 80)
+  })
+
   test("历史问答显示在当前对话上方", () => {
     const view: AgentSessionView = {
       status: "completed",
