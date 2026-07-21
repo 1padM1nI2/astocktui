@@ -68,6 +68,7 @@ export function nextScheduledRunAt(schedule: ScheduledTaskSchedule, now: Date): 
   const delayMinutes =
     minutes > current.minutes ? minutes - current.minutes : 1_440 - current.minutes + minutes
   const next = new Date(now.getTime() + delayMinutes * 60_000)
+  next.setUTCSeconds(0, 0)
   if (!schedule.weekdaysOnly) return next.toISOString()
   while (!isShanghaiWeekday(next)) next.setUTCDate(next.getUTCDate() + 1)
   return next.toISOString()

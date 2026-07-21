@@ -1,5 +1,5 @@
-import { type AgentEventSink, AgentTaskScheduler, type AutomationTimer } from "./agent-scheduler"
-import { AgentSchedulerStore } from "./agent-scheduler-store"
+import type { AgentEventSink } from "./agent-event-dispatcher"
+import type { RefreshScheduler } from "./auto-refresh"
 import { ConditionalOrderService } from "./conditional-order-service"
 import { ConditionalOrderStore } from "./conditional-order-store"
 import { createScheduledTaskService } from "./scheduled-task-runtime"
@@ -7,15 +7,13 @@ import type { ScheduledTaskService } from "./scheduled-task-service"
 
 export interface AutomationRuntimeOptions {
   readonly sink: AgentEventSink
-  readonly timer?: AutomationTimer | undefined
-  readonly lastActivityAt: () => number
+  readonly timer?: RefreshScheduler | undefined
   readonly lotSize: number
 }
 
 export class AutomationRuntime {
   readonly conditions: ConditionalOrderService
   readonly tasks: ScheduledTaskService
-  readonly scheduler: AgentTaskScheduler
 
   constructor(options: AutomationRuntimeOptions) {
     this.conditions = new ConditionalOrderService({
@@ -23,13 +21,6 @@ export class AutomationRuntime {
       lotSize: options.lotSize,
       store: new ConditionalOrderStore(),
     })
-    this.tasks = createScheduledTaskService(options.sink)
-    this.scheduler = new AgentTaskScheduler({
-      sink: options.sink,
-      timer: options.timer,
-      lastActivityAt: options.lastActivityAt,
-      tasks: this.tasks,
-      store: new AgentSchedulerStore(),
-    })
+    this.tasks = createScheduledTaskService(options.sink, options.timer)
   }
 }

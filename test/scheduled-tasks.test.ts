@@ -54,4 +54,14 @@ describe("定时任务规则", () => {
       "2026-07-17T01:15:00.000Z",
     )
   })
+
+  test("每日任务的下次运行时间取整到分钟，不继承当前秒数", () => {
+    const now = at("2026-07-17T01:00:37.123Z") // 周五 09:00:37（上海）
+    expect(nextScheduledRunAt({ kind: "daily", time: "09:50", weekdaysOnly: false }, now)).toBe(
+      "2026-07-17T01:50:00.000Z",
+    )
+    expect(nextScheduledRunAt({ kind: "daily", time: "09:00", weekdaysOnly: false }, now)).toBe(
+      "2026-07-18T01:00:00.000Z",
+    )
+  })
 })

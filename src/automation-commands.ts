@@ -9,26 +9,6 @@ const unavailable = (): CommandResult => output("自动化", ["自动化服务�
 
 export const AUTOMATION_COMMANDS: readonly AppCommand[] = [
   {
-    name: "schedule",
-    aliases: [],
-    category: "system",
-    usage: "/schedule [on|off|run preopen|intraday]",
-    description: "查看或控制自动化任务",
-    execute: (context, args) => {
-      const schedule = context.agentSchedule?.()
-      if (schedule === undefined) return unavailable()
-      if (args[0] === "on") schedule.setEnabled(true)
-      if (args[0] === "off") schedule.setEnabled(false)
-      if (args[0] === "run" && (args[1] === "preopen" || args[1] === "intraday"))
-        schedule.runNow(args[1])
-      return output("自动化任务", [
-        `状态 ${schedule.settings.enabled ? "已启用" : "已停用"}`,
-        `盘前 ${schedule.settings.preopenTime}`,
-        `盘中每 ${schedule.settings.intradayIntervalMinutes} 分钟`,
-      ])
-    },
-  },
-  {
     name: "condition",
     aliases: [],
     category: "portfolio",

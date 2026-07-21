@@ -92,7 +92,6 @@ export class MarketIntelligenceApp implements Component {
     this.#automation = new AutomationRuntime({
       sink: this.#dispatcher,
       timer: refreshScheduler,
-      lastActivityAt: () => this.#input.lastActivityAt,
       lotSize: this.#trading.lotSize,
     })
     this.#input = new AppInputHandler({
@@ -162,11 +161,11 @@ export class MarketIntelligenceApp implements Component {
 
   startAutoRefresh(): void {
     this.#autoRefresh.start()
-    this.#automation.scheduler.start()
+    this.#automation.tasks.start()
   }
   stopAutoRefresh(): void {
     this.#autoRefresh.stop()
-    this.#automation.scheduler.stop()
+    this.#automation.tasks.stop()
   }
   async dispose(): Promise<void> {
     this.stopAutoRefresh()
@@ -202,7 +201,7 @@ export class MarketIntelligenceApp implements Component {
         if (refreshNews) void this.refreshNews()
         return { market, news }
       },
-      agentSchedule: () => this.#automation.scheduler,
+      systemEvents: () => this.#dispatcher,
       conditionalOrders: () => this.#automation.conditions,
       scheduledTasks: () => this.#automation.tasks,
       memory: () => this.#memory,

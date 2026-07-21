@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { type AgentSystemEvent, AgentTaskScheduler } from "../src/agent-scheduler"
+import type { AgentSystemEvent } from "../src/agent-event-dispatcher"
 import type { CommandContext, CommandResult } from "../src/commands"
 import { MEMORY_COMMANDS } from "../src/memory-commands"
 import { MemoryService } from "../src/memory-service"
@@ -23,17 +23,14 @@ function fixture(): {
   })
   const events: AgentSystemEvent[] = []
   const keys = new Set<string>()
-  const scheduler = new AgentTaskScheduler({
-    now: () => NOW,
-    sink: {
-      enqueue: (event) => {
-        if (keys.has(event.dedupeKey)) return "deduped"
-        keys.add(event.dedupeKey)
-        events.push(event)
-        return "queued"
-      },
+  const sink = {
+    enqueue(event: AgentSystemEvent): "queued" | "deduped" {
+      if (keys.has(event.dedupeKey)) return "deduped"
+      keys.add(event.dedupeKey)
+      events.push(event)
+      return "queued"
     },
-  })
+  }
   const context: CommandContext = {
     focus: () => {},
     refresh: () => ({ market: "skipped", news: "skipped" }),
@@ -59,7 +56,7 @@ function fixture(): {
     portfolioChanged: () => {},
     watchlist: () => [],
     changeWatchlist: async () => ({ ok: false, code: "", message: "未实现" }),
-    agentSchedule: () => scheduler,
+    systemEvents: () => sink,
     memory: () => service,
   }
   return { directory, context, service, events }

@@ -1,4 +1,4 @@
-import type { AgentEventSink } from "./agent-scheduler"
+import type { AgentEventSink } from "./agent-event-dispatcher"
 import type { ConditionalOrderStore } from "./conditional-order-store"
 import {
   type ConditionalOrder,

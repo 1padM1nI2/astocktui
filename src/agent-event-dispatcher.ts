@@ -1,5 +1,21 @@
 import type { AgentController } from "./agent-controller"
-import type { AgentSystemEvent } from "./agent-scheduler"
+
+export type AgentTaskKind = "condition" | "dream" | "custom"
+
+export interface AgentSystemEvent {
+  readonly kind: AgentTaskKind
+  readonly dedupeKey: string
+  readonly title: string
+  readonly prompt: string
+  readonly createdAt: string
+  readonly taskId?: string
+  readonly taskName?: string
+  readonly source?: "user" | "agent"
+}
+
+export interface AgentEventSink {
+  enqueue(event: AgentSystemEvent): "queued" | "deduped"
+}
 
 export class AgentEventDispatcher {
   readonly #agent: AgentController

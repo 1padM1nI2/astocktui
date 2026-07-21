@@ -86,7 +86,6 @@ describe("应用命令注册表", () => {
       "account",
       "mcp",
       "clear",
-      "schedule",
       "condition",
       "task",
       "memory",
@@ -153,7 +152,6 @@ test("/task 创建并管理自定义定时任务", () => {
     expect(executeSync("/task pause TASK-0001", context).lines.join("\n")).toContain("已暂停")
     expect(executeSync("/task resume TASK-0001", context).lines.join("\n")).toContain("已恢复")
     expect(executeSync("/task run TASK-0001", context).lines.join("\n")).toContain("已排队")
-    expect(executeSync("/task builtin", context).lines.join("\n")).toContain("盘前计划")
     expect(executeSync("/task add interval 0 错误 :: 无效", context).title).toBe("命令错误")
   } finally {
     rmSync(directory, { recursive: true, force: true })

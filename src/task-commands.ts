@@ -2,7 +2,7 @@ import type { AppCommand, CommandResult } from "./commands"
 import type { ScheduledTaskInput, ScheduledTaskSchedule } from "./scheduled-tasks"
 
 const USAGE =
-  "/task [list|builtin|add|update|pause|resume|remove|run]；新增：/task add <once|daily|interval> … <名称> :: <提示>"
+  "/task [list|add|update|pause|resume|remove|run]；新增：/task add <once|daily|interval> … <名称> :: <提示>"
 
 function output(title: string, lines: readonly string[]): CommandResult {
   return { kind: "output", title, lines }
@@ -68,11 +68,6 @@ export const TASK_COMMANDS: readonly AppCommand[] = [
       const service = context.scheduledTasks?.()
       if (service === undefined) return output("定时任务", ["定时任务服务尚未就绪"])
       const action = args[0] ?? "list"
-      if (action === "builtin")
-        return output("内置自动化任务", [
-          "盘前计划与盘中检查：使用 /schedule 管理",
-          "记忆整理：使用 /memory dream 手动触发",
-        ])
       if (action === "list") {
         const tasks = service.list()
         return output(

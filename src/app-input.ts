@@ -22,18 +22,12 @@ export interface AppInputOptions {
 
 export class AppInputHandler {
   readonly #options: AppInputOptions
-  #lastActivityAt = Date.now()
 
   constructor(options: AppInputOptions) {
     this.#options = options
   }
 
-  get lastActivityAt(): number {
-    return this.#lastActivityAt
-  }
-
   handle(data: string): void {
-    this.#lastActivityAt = Date.now()
     const options = this.#options
     if (data.startsWith("\x1b[200~") && data.endsWith("\x1b[201~")) {
       const text = data.slice("\x1b[200~".length, -"\x1b[201~".length)

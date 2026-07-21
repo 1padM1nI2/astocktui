@@ -1,4 +1,4 @@
-import type { AgentTaskScheduler } from "./agent-scheduler"
+import type { AgentEventSink } from "./agent-event-dispatcher"
 import type { CommandExecution } from "./commands"
 import type { ConditionalOrderService } from "./conditional-order-service"
 import type { MarketSnapshot } from "./market-data"
@@ -49,7 +49,7 @@ export interface CommandContext {
   portfolioChanged(): void
   watchlist(): readonly string[]
   changeWatchlist(action: "add" | "remove", code: string): Promise<WatchlistChange>
-  agentSchedule?(): AgentTaskScheduler
+  systemEvents?(): AgentEventSink
   conditionalOrders?(): ConditionalOrderService
   scheduledTasks?(): ScheduledTaskService
   memory?(): MemoryService

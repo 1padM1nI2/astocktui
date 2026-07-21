@@ -16,7 +16,7 @@ test("系统事件按顺序派发并去重", async () => {
   const dispatcher = new AgentEventDispatcher(new AgentController(driver, "test"))
   expect(
     dispatcher.enqueue({
-      kind: "intraday",
+      kind: "custom",
       dedupeKey: "x",
       title: "检查",
       prompt: "一",
@@ -25,7 +25,7 @@ test("系统事件按顺序派发并去重", async () => {
   ).toBe("queued")
   expect(
     dispatcher.enqueue({
-      kind: "intraday",
+      kind: "custom",
       dedupeKey: "x",
       title: "检查",
       prompt: "一",
