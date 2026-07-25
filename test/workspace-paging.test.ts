@@ -24,33 +24,41 @@ function press(
 describe("行情工作区翻页", () => {
   const codes = Array.from({ length: 20 }, (_, index) => `SH6000${String(index).padStart(2, "0")}`)
 
-  test("自选股超出面板高度时可用上下键滚动浏览", () => {
+  test("上下键移动选中光标，视图跟随且选中行反色", () => {
     const market = new MarketWorkspace(codes)
+    expect(market.selectedCode).toBe(codes[0])
 
     const top = frameText(renderWorkspacePanel(market, 40, 8, true))
     expect(top).toContain("600000")
     expect(top).not.toContain("600005")
 
     press(market, "\x1b[B", 4)
-    const scrolled = frameText(renderWorkspacePanel(market, 40, 8, true))
-    expect(scrolled).not.toContain("600000")
-    expect(scrolled).toContain("600005")
+    expect(market.selectedCode).toBe(codes[4])
+    const scrolled = renderWorkspacePanel(market, 40, 8, true)
+    const scrolledText = frameText(scrolled)
+    expect(scrolledText).toContain("600004")
+    const selectedLine = scrolled.find((line) => line.includes("600004")) ?? ""
+    expect(selectedLine).toContain("\x1b[7m")
+    const idleLine = scrolled.find((line) => line.includes("600003")) ?? ""
+    expect(idleLine).not.toContain("\x1b[7m")
 
     press(market, "\x1b[A", 4)
+    expect(market.selectedCode).toBe(codes[0])
     const restored = frameText(renderWorkspacePanel(market, 40, 8, true))
     expect(restored).toContain("600000")
   })
 
-  test("PageDown 与 PageUp 按面板高度翻页", () => {
+  test("PageDown 与 PageUp 按面板高度移动光标翻页", () => {
     const market = new MarketWorkspace(codes)
 
     renderWorkspacePanel(market, 40, 8, true)
     market.handleInput("\x1b[6~")
-    const paged = frameText(renderWorkspacePanel(market, 40, 8, true))
-    expect(paged).not.toContain("600000")
-    expect(paged).toContain("600009")
+    expect(market.selectedCode).not.toBe(codes[0])
+    const paged = renderWorkspacePanel(market, 40, 8, true)
+    expect(paged.some((line) => line.includes("\x1b[7m"))).toBe(true)
 
     market.handleInput("\x1b[5~")
+    expect(market.selectedCode).toBe(codes[0])
     const back = frameText(renderWorkspacePanel(market, 40, 8, true))
     expect(back).toContain("600000")
   })

@@ -1,4 +1,5 @@
 import type { Component } from "@oh-my-pi/pi-tui"
+import { matchesKey } from "@oh-my-pi/pi-tui"
 import { ANSI } from "../colors"
 import type { MarketQuote, MarketSnapshot } from "../market-data"
 import { DEFAULT_WATCHLIST, DEFAULT_WATCHLIST_CODES } from "../market-data"
@@ -89,6 +90,8 @@ export class MarketWorkspace implements Component {
   #status: "idle" | "loading" | "ready" | "error" = "idle"
   #quotesByCode: Readonly<Record<string, MarketQuote>> = {}
   #watchlistCodes: readonly string[]
+  #selectedIndex = 0
+  #rowsStartLine = 4
   readonly #scroll = new ListScrollState()
 
   constructor(codes: readonly string[] = DEFAULT_WATCHLIST_CODES) {
@@ -99,12 +102,30 @@ export class MarketWorkspace implements Component {
     return this.#scroll
   }
 
+  get selectedCode(): string | undefined {
+    return this.#watchlistCodes[this.#selectedIndex]
+  }
+
   handleInput(data: string): boolean {
-    return this.#scroll.handleInput(data)
+    const count = this.#watchlistCodes.length
+    if (count === 0) return this.#scroll.handleInput(data)
+    if (matchesKey(data, "up")) this.#selectedIndex = Math.max(0, this.#selectedIndex - 1)
+    else if (matchesKey(data, "down"))
+      this.#selectedIndex = Math.min(count - 1, this.#selectedIndex + 1)
+    else if (matchesKey(data, "pageUp"))
+      this.#selectedIndex = Math.max(0, this.#selectedIndex - this.#scroll.viewportRows)
+    else if (matchesKey(data, "pageDown"))
+      this.#selectedIndex = Math.min(count - 1, this.#selectedIndex + this.#scroll.viewportRows)
+    else if (matchesKey(data, "home")) this.#selectedIndex = 0
+    else if (matchesKey(data, "end")) this.#selectedIndex = count - 1
+    else return false
+    this.#scroll.ensureVisible(this.#rowsStartLine - 2 + this.#selectedIndex)
+    return true
   }
 
   setWatchlist(codes: readonly string[]): void {
     this.#watchlistCodes = [...codes]
+    this.#selectedIndex = Math.min(this.#selectedIndex, Math.max(0, codes.length - 1))
   }
   get status(): "idle" | "loading" | "ready" | "error" {
     return this.#status
@@ -169,59 +190,59 @@ export class MarketWorkspace implements Component {
           )
         : renderTableRow("代码", "名称", "现价", "涨跌幅", safeWidth),
     )
-    for (const code of this.#watchlistCodes) {
+    this.#rowsStartLine = lines.length
+    for (const [rowIndex, code] of this.#watchlistCodes.entries()) {
+      const selected = rowIndex === this.#selectedIndex
       const quote = this.#quotesByCode[code]
       if (quote === undefined) {
-        lines.push(
-          expanded
-            ? renderFullTableRow(
-                [
-                  code,
-                  marketLabel(undefined, code),
-                  DEFAULT_NAMES.get(code) ?? "等待行情",
-                  "--",
-                  "--",
-                  "--",
-                  "--",
-                ],
-                safeWidth,
-              )
-            : renderTableRow(
-                displayCode(code),
+        const row = expanded
+          ? renderFullTableRow(
+              [
+                code,
+                marketLabel(undefined, code),
                 DEFAULT_NAMES.get(code) ?? "等待行情",
                 "--",
                 "--",
-                safeWidth,
-              ),
-        )
+                "--",
+                "--",
+              ],
+              safeWidth,
+            )
+          : renderTableRow(
+              displayCode(code),
+              DEFAULT_NAMES.get(code) ?? "等待行情",
+              "--",
+              "--",
+              safeWidth,
+            )
+        lines.push(selected ? `${ANSI.reverse}${row}${ANSI.reset}` : row)
         continue
       }
       const sign = quote.changePercent > 0 ? "+" : ""
       const color = trendColor(quote.changePercent)
       const reset = color.length > 0 ? ANSI.reset : ""
       const change = `${color}${sign}${quote.changePercent.toFixed(2)}%${reset}`
-      lines.push(
-        expanded
-          ? renderFullTableRow(
-              [
-                quote.code,
-                marketLabel(quote, quote.code),
-                quote.name,
-                quote.price.toFixed(2),
-                change,
-                renderMiniSparkline(quote.trend),
-                stateLabel(quote),
-              ],
-              safeWidth,
-            )
-          : renderTableRow(
-              displayCode(quote.code),
+      const row = expanded
+        ? renderFullTableRow(
+            [
+              quote.code,
+              marketLabel(quote, quote.code),
               quote.name,
               quote.price.toFixed(2),
               change,
-              safeWidth,
-            ),
-      )
+              renderMiniSparkline(quote.trend),
+              stateLabel(quote),
+            ],
+            safeWidth,
+          )
+        : renderTableRow(
+            displayCode(quote.code),
+            quote.name,
+            quote.price.toFixed(2),
+            change,
+            safeWidth,
+          )
+      lines.push(selected ? `${ANSI.reverse}${row}${ANSI.reset}` : row)
     }
     return lines
   }

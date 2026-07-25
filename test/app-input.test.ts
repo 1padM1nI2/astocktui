@@ -9,6 +9,7 @@ function inputFixture(): {
   readonly marketKeys: string[]
   readonly portfolioKeys: string[]
   readonly tradeKeys: string[]
+  readonly executed: string[]
   tab: number
   setTab(tab: number): void
 } {
@@ -16,12 +17,14 @@ function inputFixture(): {
   const marketKeys: string[] = []
   const portfolioKeys: string[] = []
   const tradeKeys: string[] = []
+  const executed: string[] = []
   const state = { tab: 0 }
   return {
     prompt,
     marketKeys,
     portfolioKeys,
     tradeKeys,
+    executed,
     get tab() {
       return state.tab
     },
@@ -35,10 +38,14 @@ function inputFixture(): {
       setActiveTab: (tab) => {
         state.tab = tab
       },
-      executeCommand: () => ({ kind: "output", title: "", lines: [] }),
+      executeCommand: (input) => {
+        executed.push(input)
+        return { kind: "output", title: "", lines: [] }
+      },
       promptAgent: () => {},
       refreshMarket: () => {},
       refreshNews: () => {},
+      selectedMarketCode: () => "SH600519",
       handleNewsInput: () => {},
       handleMarketInput: (data) => {
         marketKeys.push(data)
@@ -90,4 +97,18 @@ test("粘贴的命令保留为可编辑命令而不立即执行", () => {
 
   expect(fixture.prompt.view.input).toBe("/task list")
   expect(fixture.prompt.view.isPaletteOpen).toBe(true)
+})
+
+test("行情页按空格或回车打开选中个股详情并切换到 Agent", () => {
+  const fixture = inputFixture()
+
+  fixture.handler.handle(" ")
+  expect(fixture.executed).toEqual(["/quote SH600519"])
+  expect(fixture.tab).toBe(3)
+  expect(fixture.marketKeys).toEqual([])
+
+  fixture.setTab(0)
+  fixture.handler.handle("\r")
+  expect(fixture.executed).toEqual(["/quote SH600519", "/quote SH600519"])
+  expect(fixture.tab).toBe(3)
 })
