@@ -162,6 +162,16 @@ test("焦点股在走势图下方展示今开高低昨收与成交量", () => {
         low: 104,
         previousClose: 108,
         volume: 65_181,
+        detail: {
+          code: "SH600519",
+          turnover: 462_224,
+          turnoverRate: 0.29,
+          amplitude: 1.78,
+          peTtm: 19.61,
+          totalMarketCap: 16_218.68,
+          limitUp: 1421.21,
+          limitDown: 1162.81,
+        },
       },
       { code: "SZ000858", name: "五粮液", price: 73.4, changePercent: 0.8, source: "tencent" },
     ],
@@ -174,6 +184,13 @@ test("焦点股在走势图下方展示今开高低昨收与成交量", () => {
   expect(stats).toContain("最低 104.00")
   expect(stats).toContain("昨收 108.00")
   expect(stats).toContain("量 6.5万手")
+
+  const detail = frame.find((line) => line.includes("成交额")) ?? ""
+  expect(detail).toContain("成交额 46.2亿")
+  expect(detail).toContain("换手 0.29%")
+  expect(detail).toContain("振幅 1.78%")
+  expect(detail).toContain("PE 19.6")
+  expect(detail).toContain("总市值 1.62万亿")
 
   const sparse = new MarketWorkspace(["SZ000858"])
   sparse.applySnapshot({

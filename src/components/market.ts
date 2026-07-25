@@ -160,11 +160,7 @@ export class MarketWorkspace implements Component {
     lines.push(fitLine(`行情 / ${hasGlobal ? "全球股票" : "沪深A股"} 实时 ${status}`, safeWidth))
     lines.push("─".repeat(safeWidth))
     lines.push(renderSparkline(this.#snapshot?.trend ?? [], safeWidth))
-    const focusStats = renderFocusStats(
-      this.#quotesByCode[this.#watchlistCodes[0] ?? ""],
-      safeWidth,
-    )
-    if (focusStats !== null) lines.push(focusStats)
+    lines.push(...renderFocusStats(this.#quotesByCode[this.#watchlistCodes[0] ?? ""], safeWidth))
     lines.push(
       expanded
         ? renderFullTableRow(

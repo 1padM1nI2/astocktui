@@ -1,6 +1,7 @@
 import { stocks } from "stock-api"
 import { YahooGlobalMarketDataSource } from "./global-market-data"
 import { isAshareCode, normalizeMarketCode, parseMarketCode, type StockMarket } from "./market-code"
+import { fetchTencentStockDetails, type StockDetail, type StockDetailFetcher } from "./stock-detail"
 
 export interface WatchlistItem {
   readonly code: string
@@ -36,6 +37,7 @@ export interface MarketQuote {
   readonly previousClose?: number
   readonly volume?: number
   readonly trend?: readonly number[]
+  readonly detail?: StockDetail
   readonly asOf?: number | null
 }
 
@@ -92,23 +94,31 @@ const KLINE_CACHE_TTL_MS = 5 * 60_000
 export class StockApiMarketDataSource implements MarketDataSource {
   readonly #client: StockApiClient
   readonly #now: () => number
+  readonly #detailFetcher: StockDetailFetcher | undefined
   readonly #klineCache = new Map<
     string,
     { readonly at: number; readonly klines: readonly StockApiKline[] }
   >()
 
-  constructor(client: StockApiClient = stocks.auto, now: () => number = Date.now) {
+  constructor(
+    client: StockApiClient = stocks.auto,
+    now: () => number = Date.now,
+    detailFetcher: StockDetailFetcher | undefined = fetchTencentStockDetails,
+  ) {
     this.#client = client
     this.#now = now
+    this.#detailFetcher = detailFetcher
   }
 
   async loadSnapshot(codes: readonly string[]): Promise<MarketSnapshot> {
     const focusCode = codes[0]
     if (focusCode === undefined) throw new Error("自选股为空")
 
-    const [rawQuotes, klines] = await Promise.all([
+    const [rawQuotes, klines, details] = await Promise.all([
       this.#client.getStocks([...codes]),
       Promise.all(codes.map((code) => this.#loadKlines(code))),
+      this.#detailFetcher?.(codes).catch((): ReadonlyMap<string, StockDetail> => new Map()) ??
+        Promise.resolve(new Map<string, StockDetail>()),
     ])
     const klinesByCode = new Map(codes.map((code, index) => [code, klines[index] ?? []]))
 
@@ -147,14 +157,15 @@ export class StockApiMarketDataSource implements MarketDataSource {
         .filter((kline) => Number.isFinite(kline.close) && kline.close > 0)
         .map((kline) => kline.close)
       const lastKline = rows.at(-1)
-      const open = lastKline?.open
+      const open = lastKline?.open ?? details.get(quote.code)?.open
       const klineVolume = lastKline?.volume
       const volume =
         typeof quote.volume === "number" && quote.volume > 0
           ? quote.volume
           : typeof klineVolume === "number" && klineVolume > 0
             ? klineVolume
-            : undefined
+            : details.get(quote.code)?.volume
+      const detail = details.get(quote.code)
       quotes.push({
         code: quote.code,
         name: quote.name,
@@ -167,6 +178,7 @@ export class StockApiMarketDataSource implements MarketDataSource {
         ...(quote.yesterday > 0 ? { previousClose: quote.yesterday } : {}),
         ...(volume === undefined ? {} : { volume }),
         ...(quoteTrend.length > 0 ? { trend: quoteTrend } : {}),
+        ...(detail === undefined ? {} : { detail }),
       })
       if (snapshotSource.length === 0) snapshotSource = source
       else if (snapshotSource !== source) snapshotSource = "多源"

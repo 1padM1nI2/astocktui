@@ -48,8 +48,8 @@ export function renderMiniSparkline(prices: readonly number[] | undefined): stri
   return `${color}${spark}${reset}`
 }
 
-export function renderFocusStats(quote: MarketQuote | undefined, width: number): string | null {
-  if (quote === undefined) return null
+export function renderFocusStats(quote: MarketQuote | undefined, width: number): readonly string[] {
+  if (quote === undefined) return []
   const parts: string[] = []
   if (quote.open !== undefined) parts.push(`今开 ${quote.open.toFixed(2)}`)
   if (quote.high !== undefined) parts.push(`最高 ${quote.high.toFixed(2)}`)
@@ -59,5 +59,25 @@ export function renderFocusStats(quote: MarketQuote | undefined, width: number):
     parts.push(
       `量 ${quote.volume >= 10_000 ? `${(quote.volume / 10_000).toFixed(1)}万手` : `${Math.round(quote.volume)}手`}`,
     )
-  return parts.length === 0 ? null : fitLine(parts.join(" · "), width)
+  const lines: string[] = []
+  if (parts.length > 0) lines.push(fitLine(parts.join(" · "), width))
+  const detail = quote.detail
+  if (detail !== undefined) {
+    const extra: string[] = []
+    if (detail.turnover !== undefined)
+      extra.push(
+        `成交额 ${detail.turnover >= 10_000 ? `${(detail.turnover / 10_000).toFixed(1)}亿` : `${Math.round(detail.turnover)}万`}`,
+      )
+    if (detail.turnoverRate !== undefined) extra.push(`换手 ${detail.turnoverRate.toFixed(2)}%`)
+    if (detail.amplitude !== undefined) extra.push(`振幅 ${detail.amplitude.toFixed(2)}%`)
+    if (detail.peTtm !== undefined) extra.push(`PE ${detail.peTtm.toFixed(1)}`)
+    if (detail.totalMarketCap !== undefined)
+      extra.push(
+        `总市值 ${detail.totalMarketCap >= 10_000 ? `${(detail.totalMarketCap / 10_000).toFixed(2)}万亿` : `${detail.totalMarketCap.toFixed(0)}亿`}`,
+      )
+    if (detail.limitUp !== undefined && detail.limitDown !== undefined)
+      extra.push(`涨停 ${detail.limitUp.toFixed(2)} / 跌停 ${detail.limitDown.toFixed(2)}`)
+    if (extra.length > 0) lines.push(fitLine(extra.join(" · "), width))
+  }
+  return lines
 }

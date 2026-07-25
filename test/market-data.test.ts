@@ -81,10 +81,20 @@ describe("stock-api 行情适配", () => {
       },
     }
 
-    const snapshot = await new StockApiMarketDataSource(client).loadSnapshot([
-      "SH600519",
-      "SZ000858",
-    ])
+    const snapshot = await new StockApiMarketDataSource(client, Date.now, async (codes) => {
+      const details = new Map()
+      if (codes.includes("SH600519"))
+        details.set("SH600519", {
+          code: "SH600519",
+          turnover: 462_224,
+          turnoverRate: 0.29,
+          peTtm: 19.61,
+          totalMarketCap: 16_218.68,
+          limitUp: 1421.21,
+          limitDown: 1162.81,
+        })
+      return details
+    }).loadSnapshot(["SH600519", "SZ000858"])
 
     expect(requestedCodes).toEqual(["SH600519", "SZ000858"])
     expect(klineCalls.sort()).toEqual(["SH600519:day:24", "SZ000858:day:24"])
@@ -102,6 +112,15 @@ describe("stock-api 行情适配", () => {
           high: 1499,
           low: 1460,
           previousClose: 1471.08,
+          detail: {
+            code: "SH600519",
+            turnover: 462_224,
+            turnoverRate: 0.29,
+            peTtm: 19.61,
+            totalMarketCap: 16_218.68,
+            limitUp: 1421.21,
+            limitDown: 1162.81,
+          },
         },
         {
           code: "SZ000858",
@@ -145,7 +164,11 @@ describe("stock-api 行情适配", () => {
         return [{ close: 1470 }]
       },
     }
-    const source = new StockApiMarketDataSource(client, () => tick * 60_000)
+    const source = new StockApiMarketDataSource(
+      client,
+      () => tick * 60_000,
+      async () => new Map(),
+    )
 
     await source.loadSnapshot(["SH600519"])
     expect(calls).toBe(1)
@@ -174,6 +197,8 @@ describe("stock-api 行情适配", () => {
         ],
         new Error("K 线暂不可用"),
       ),
+      Date.now,
+      async () => new Map(),
     )
 
     const snapshot = await source.loadSnapshot(["SH600519"])
@@ -184,7 +209,7 @@ describe("stock-api 行情适配", () => {
   })
 
   test("拒绝上游空结果和 base 占位数据", async () => {
-    const empty = new StockApiMarketDataSource(clientWith([]))
+    const empty = new StockApiMarketDataSource(clientWith([]), Date.now, async () => new Map())
     const placeholder = new StockApiMarketDataSource(
       clientWith([
         {
@@ -198,6 +223,8 @@ describe("stock-api 行情适配", () => {
           source: "base",
         },
       ]),
+      Date.now,
+      async () => new Map(),
     )
 
     expect(empty.loadSnapshot(["SH600519"])).rejects.toThrow("没有可用行情")
@@ -218,6 +245,8 @@ describe("stock-api 行情适配", () => {
           source: "tencent",
         },
       ]),
+      Date.now,
+      async () => new Map(),
     )
     const unsafeSource = new StockApiMarketDataSource(
       clientWith([
@@ -232,6 +261,8 @@ describe("stock-api 行情适配", () => {
           source: "tencent\x1b[2J",
         },
       ]),
+      Date.now,
+      async () => new Map(),
     )
 
     expect(unsafeName.loadSnapshot(["SH600519"])).rejects.toThrow("没有可用行情")
