@@ -1,5 +1,11 @@
+export interface OrderBookLevel {
+  readonly price: number
+  readonly volume: number
+}
+
 export interface StockDetail {
   readonly code: string
+  readonly name?: string
   readonly open?: number
   readonly volume?: number
   readonly turnover?: number
@@ -13,6 +19,10 @@ export interface StockDetail {
   readonly limitDown?: number
   readonly volumeRatio?: number
   readonly averagePrice?: number
+  readonly week52High?: number
+  readonly week52Low?: number
+  readonly bids?: readonly OrderBookLevel[]
+  readonly asks?: readonly OrderBookLevel[]
 }
 
 export type StockDetailFetcher = (
@@ -35,7 +45,19 @@ const TENCENT_FIELD = {
   limitDown: 48,
   volumeRatio: 49,
   averagePrice: 51,
+  week52High: 67,
+  week52Low: 68,
 } as const
+
+function parseLevels(parts: readonly string[], start: number): readonly OrderBookLevel[] {
+  const levels: OrderBookLevel[] = []
+  for (let index = start; index < start + 10; index += 2) {
+    const price = numberAt(parts, index)
+    const volume = numberAt(parts, index + 1)
+    if (price !== undefined && volume !== undefined) levels.push({ price, volume })
+  }
+  return levels
+}
 
 function numberAt(parts: readonly string[], index: number): number | undefined {
   const value = Number(parts[index])
@@ -44,6 +66,7 @@ function numberAt(parts: readonly string[], index: number): number | undefined {
 
 export function parseTencentDetail(code: string, payload: string): StockDetail {
   const parts = payload.split("~")
+  const name = parts[1]?.trim()
   const open = numberAt(parts, TENCENT_FIELD.open)
   const volume = numberAt(parts, TENCENT_FIELD.volume)
   const turnover = numberAt(parts, TENCENT_FIELD.turnover)
@@ -57,8 +80,13 @@ export function parseTencentDetail(code: string, payload: string): StockDetail {
   const limitDown = numberAt(parts, TENCENT_FIELD.limitDown)
   const volumeRatio = numberAt(parts, TENCENT_FIELD.volumeRatio)
   const averagePrice = numberAt(parts, TENCENT_FIELD.averagePrice)
+  const week52High = numberAt(parts, TENCENT_FIELD.week52High)
+  const week52Low = numberAt(parts, TENCENT_FIELD.week52Low)
+  const bids = parseLevels(parts, 9)
+  const asks = parseLevels(parts, 19)
   return {
     code,
+    ...(name === undefined || name.length === 0 ? {} : { name }),
     ...(open === undefined ? {} : { open }),
     ...(volume === undefined ? {} : { volume }),
     ...(turnover === undefined ? {} : { turnover }),
@@ -72,6 +100,10 @@ export function parseTencentDetail(code: string, payload: string): StockDetail {
     ...(limitDown === undefined ? {} : { limitDown }),
     ...(volumeRatio === undefined ? {} : { volumeRatio }),
     ...(averagePrice === undefined ? {} : { averagePrice }),
+    ...(week52High === undefined ? {} : { week52High }),
+    ...(week52Low === undefined ? {} : { week52Low }),
+    ...(bids.length === 0 ? {} : { bids }),
+    ...(asks.length === 0 ? {} : { asks }),
   }
 }
 

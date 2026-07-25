@@ -10,6 +10,7 @@ import type { NewsWorkspace } from "./components/news"
 import type { PortfolioWorkspace } from "./components/portfolio"
 import type { MarketOverviewService } from "./market-overview"
 import type { MemoryService } from "./memory-service"
+import { fetchTencentStockDetails } from "./stock-detail"
 import type { PaperTradingService } from "./trading"
 import type { WatchlistCoordinator } from "./watchlist-coordinator"
 
@@ -63,6 +64,7 @@ export function buildCommandContext(deps: AppCommandContextDeps): CommandContext
     newsSnapshot: () => deps.news.snapshot,
     portfolio: () => deps.trading.snapshot,
     quote: (code) => deps.watchlist.resolveQuote(code),
+    quoteDetail: async (code) => (await fetchTencentStockDetails([code])).get(code),
     trading: () => deps.trading,
     portfolioChanged: () => {
       deps.portfolio.applySnapshot(deps.trading.snapshot)

@@ -8,6 +8,7 @@ import type { MemoryService } from "./memory-service"
 import type { FinancialNewsSnapshot } from "./news-data"
 import type { PortfolioSnapshot } from "./portfolio"
 import type { ScheduledTaskService } from "./scheduled-task-service"
+import type { StockDetail } from "./stock-detail"
 import type { PaperTradingService, TradeQuote } from "./trading"
 import type { WatchlistChange } from "./watchlist"
 
@@ -46,6 +47,7 @@ export interface CommandContext {
   newsSnapshot(): FinancialNewsSnapshot | null
   portfolio(): PortfolioSnapshot
   quote(code: string): Promise<TradeQuote | undefined>
+  quoteDetail?(code: string): Promise<StockDetail | undefined>
   trading(): PaperTradingService
   portfolioChanged(): void
   watchlist(): readonly string[]

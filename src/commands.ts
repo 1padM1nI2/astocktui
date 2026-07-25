@@ -4,6 +4,7 @@ import type { CommandContext, DataStatus, WorkspaceName } from "./command-contex
 import { MEMORY_COMMANDS } from "./memory-commands"
 import { MODEL_COMMANDS } from "./model-commands"
 import { calculatePortfolio } from "./portfolio"
+import { QUOTE_COMMANDS } from "./quote-commands"
 import { TASK_COMMANDS } from "./task-commands"
 import { TRADING_COMMANDS } from "./trading-commands"
 import { WATCHLIST_COMMANDS } from "./watchlist-commands"
@@ -218,6 +219,7 @@ export const APP_COMMANDS: readonly AppCommand[] = [
   ...TASK_COMMANDS,
   ...MEMORY_COMMANDS,
   ...MODEL_COMMANDS,
+  ...QUOTE_COMMANDS,
   {
     name: "quit",
     aliases: ["q", "exit"],
