@@ -50,6 +50,19 @@ test("空格进入选中模式并高亮第一条新闻", () => {
   expect(frame.find((line) => line.includes("短线快讯"))).toContain(ANSI.reverse)
 })
 
+test("选中行高亮覆盖分隔符之后的标题，不被行内 reset 截断", () => {
+  const news = new NewsWorkspace()
+  news.applySnapshot(makeSnapshot())
+  news.handleInput(" ")
+
+  const line = news.render(60).find((entry) => entry.includes("短线快讯")) ?? ""
+  const titleIndex = line.indexOf("短线快讯")
+  expect(titleIndex).toBeGreaterThan(-1)
+  // 标题之前必须至少有两个 reverse：行首一个 + 分隔符 reset 后恢复的一个
+  const beforeTitle = line.slice(0, titleIndex)
+  expect(beforeTitle.split(ANSI.reverse).length - 1).toBeGreaterThanOrEqual(2)
+})
+
 test("选中模式下空格打开详情并显示完整标题、时间和链接", () => {
   const news = new NewsWorkspace()
   news.applySnapshot(makeSnapshot())

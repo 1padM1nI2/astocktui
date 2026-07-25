@@ -12,3 +12,9 @@ export const ANSI = {
 } as const
 
 export type AnsiCode = keyof typeof ANSI
+
+/** 整行反色高亮；行内嵌套的 reset 之后自动恢复反色，避免高亮被截断 */
+export function highlightReverse(line: string): string {
+  const resume = `${ANSI.reset}${ANSI.cyan}${ANSI.reverse}`
+  return `${ANSI.cyan}${ANSI.reverse}${line.replaceAll(ANSI.reset, resume)}${ANSI.reset}`
+}

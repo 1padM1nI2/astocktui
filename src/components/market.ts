@@ -1,5 +1,5 @@
 import type { Component } from "@oh-my-pi/pi-tui"
-import { ANSI } from "../colors"
+import { ANSI, highlightReverse } from "../colors"
 import type { MarketQuote, MarketSnapshot } from "../market-data"
 import { DEFAULT_WATCHLIST, DEFAULT_WATCHLIST_CODES } from "../market-data"
 import { MarketSelectionController } from "../market-selection"
@@ -155,7 +155,7 @@ export class MarketWorkspace implements Component {
               "--",
               safeWidth,
             )
-        lines.push(selected ? `${ANSI.cyan}${ANSI.reverse}${row}${ANSI.reset}` : row)
+        lines.push(selected ? highlightReverse(row) : row)
         continue
       }
       const sign = quote.changePercent > 0 ? "+" : ""
@@ -182,7 +182,7 @@ export class MarketWorkspace implements Component {
             change,
             safeWidth,
           )
-      lines.push(selected ? `${ANSI.cyan}${ANSI.reverse}${row}${ANSI.reset}` : row)
+      lines.push(selected ? highlightReverse(row) : row)
     }
     return lines
   }

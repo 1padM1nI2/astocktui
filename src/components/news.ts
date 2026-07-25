@@ -1,5 +1,5 @@
 import type { Component } from "@oh-my-pi/pi-tui"
-import { ANSI } from "../colors"
+import { ANSI, highlightReverse } from "../colors"
 import { MarketSelectionController } from "../market-selection"
 import { type ArticleLoader, loadArticleText } from "../news-article"
 import type { FinancialNewsItem, FinancialNewsSnapshot } from "../news-data"
@@ -145,7 +145,7 @@ export class NewsWorkspace implements Component {
       const marker = `${ANSI.brightBlack}·${ANSI.reset}`
       let line = `${item.time}  ${marker} [${item.source}] ${item.title}`
       if (this.#selection.isInSelectionMode && index === this.#selection.selectedIndex) {
-        line = `${ANSI.cyan}${ANSI.reverse}${line}${ANSI.reset}`
+        line = highlightReverse(line)
       }
       lines.push(fitLine(line, safeWidth))
     }
