@@ -32,7 +32,7 @@ export class YahooGlobalMarketDataSource {
       quotes.push(result.quote)
       if (trend.length === 0) trend = result.trend
     }
-    return { quotes, trend, source: "Yahoo Finance", diagnostics }
+    return { quotes, trend, klines: [], source: "Yahoo Finance", diagnostics }
   }
 
   async #load(

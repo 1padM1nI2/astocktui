@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { stripVTControlCharacters } from "node:util"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { alignCell, fitLine } from "../src/width"
+import { alignCell, fitLine, wrapText } from "../src/width"
 
 test("将混合中文与 ANSI 的行情文本裁切到给定列宽", () => {
   // Given
@@ -23,4 +23,13 @@ test("按可见宽度对齐中文和 ANSI 单元格", () => {
   expect(visibleWidth(change)).toBe(8)
   expect(stripVTControlCharacters(change)).toBe("  +1.21%")
   expect(change).toContain("\x1b[31m")
+})
+
+test("wrapText 按显示宽度折行并保留显式换行", () => {
+  expect(wrapText("abcdefghijklmnopqrstuvwxyz", 10)).toEqual(["abcdefghij", "klmnopqrst", "uvwxyz"])
+  expect(wrapText("中文测试折行显示", 4)).toEqual(["中文", "测试", "折行", "显示"])
+  expect(wrapText("第一行\n第二行", 20)).toEqual(["第一行", "第二行"])
+  for (const line of wrapText("中英文 mixed 混排 wrapping 折行效果", 9)) {
+    expect(visibleWidth(line)).toBeLessThanOrEqual(9)
+  }
 })

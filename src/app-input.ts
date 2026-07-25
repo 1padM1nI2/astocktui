@@ -47,6 +47,8 @@ export class AppInputHandler {
       options.prompt.openPalette()
       return
     }
+    if (options.activeTab() === MARKET && data === "\x1b" && options.handleMarketInput(data))
+      return
     if (options.activeTab() !== AGENT && (data === "q" || data === "\x1b")) {
       options.onQuit()
       return

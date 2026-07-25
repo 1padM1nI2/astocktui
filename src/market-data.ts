@@ -32,6 +32,9 @@ export interface MarketQuote {
   readonly marketState?: "open" | "closed" | "delayed" | "unknown"
   readonly volume?: number
   readonly asOf?: number | null
+  readonly high?: number
+  readonly low?: number
+  readonly prevClose?: number
 }
 
 export interface MarketDataDiagnostic {
@@ -40,9 +43,20 @@ export interface MarketDataDiagnostic {
   readonly message: string
 }
 
+export interface KlineBar {
+  readonly date: string
+  readonly open: number
+  readonly close: number
+  readonly high: number
+  readonly low: number
+  readonly volume?: number
+}
+
 export interface MarketSnapshot {
   readonly quotes: readonly MarketQuote[]
   readonly trend: readonly number[]
+  readonly klines?: readonly KlineBar[]
+  readonly klinesByCode?: Readonly<Record<string, readonly KlineBar[]>>
   readonly source: string
   readonly diagnostics?: readonly MarketDataDiagnostic[]
 }
@@ -64,7 +78,12 @@ export interface StockApiQuote {
 }
 
 export interface StockApiKline {
+  readonly date: string
+  readonly open: number
   readonly close: number
+  readonly high: number
+  readonly low: number
+  readonly volume?: number
 }
 
 export interface StockApiKlineOptions {
@@ -85,14 +104,15 @@ export class StockApiMarketDataSource implements MarketDataSource {
   }
 
   async loadSnapshot(codes: readonly string[]): Promise<MarketSnapshot> {
-    const focusCode = codes[0]
-    if (focusCode === undefined) throw new Error("自选股为空")
+    if (codes.length === 0) throw new Error("自选股为空")
 
     const quoteRequest = this.#client.getStocks([...codes])
-    const trendRequest = this.#client
-      .getKlines(focusCode, { period: "day", count: 24 })
-      .catch((): readonly StockApiKline[] => [])
-    const [rawQuotes, rawKlines] = await Promise.all([quoteRequest, trendRequest])
+    const klineRequests = codes.map((code) =>
+      this.#client
+        .getKlines(code, { period: "day", count: 60 })
+        .catch((): readonly StockApiKline[] => []),
+    )
+    const [rawQuotes, ...rawKlineLists] = await Promise.all([quoteRequest, ...klineRequests])
 
     const quotes: MarketQuote[] = []
     let snapshotSource = ""
@@ -131,6 +151,9 @@ export class StockApiMarketDataSource implements MarketDataSource {
         changePercent: Math.round(quote.percent * 1_000_000) / 10_000,
         source,
         ...(typeof quote.volume === "number" && quote.volume > 0 ? { volume: quote.volume } : {}),
+        ...(Number.isFinite(quote.high) ? { high: quote.high } : {}),
+        ...(Number.isFinite(quote.low) ? { low: quote.low } : {}),
+        ...(Number.isFinite(quote.yesterday) ? { prevClose: quote.yesterday } : {}),
       })
       if (snapshotSource.length === 0) snapshotSource = source
       else if (snapshotSource !== source) snapshotSource = "多源"
@@ -138,12 +161,16 @@ export class StockApiMarketDataSource implements MarketDataSource {
 
     if (quotes.length === 0) throw new Error("没有可用行情")
 
-    const trend: number[] = []
-    for (const kline of rawKlines) {
-      if (Number.isFinite(kline.close) && kline.close > 0) trend.push(kline.close)
-    }
+    const klinesByCode: Record<string, readonly KlineBar[]> = {}
+    const barsByCode = codes.map((code, index) => {
+      const bars = toKlineBars(rawKlineLists[index] ?? [])
+      if (bars.length > 0) klinesByCode[code] = bars
+      return bars
+    })
+    const klines = barsByCode[0] ?? []
+    const trend = klines.map((bar) => bar.close)
 
-    return { quotes, trend, source: snapshotSource }
+    return { quotes, trend, klines, klinesByCode, source: snapshotSource }
   }
 }
 
@@ -184,15 +211,44 @@ export class CompositeMarketDataSource implements MarketDataSource {
     const trend =
       snapshots.find((snapshot) => snapshot.quotes.some((quote) => quote.code === focus))?.trend ??
       []
+    const klines =
+      snapshots.find((snapshot) => snapshot.quotes.some((quote) => quote.code === focus))?.klines ??
+      []
     const diagnostics = snapshots.flatMap((snapshot) => snapshot.diagnostics ?? [])
+    const klinesByCode: Record<string, readonly KlineBar[]> = {}
+    let hasKlinesByCode = false
+    for (const snapshot of snapshots) {
+      if (snapshot.klinesByCode === undefined) continue
+      hasKlinesByCode = true
+      Object.assign(klinesByCode, snapshot.klinesByCode)
+    }
     const sourceNames = [...new Set(quotes.map((quote) => quote.source))]
     return {
       quotes,
       trend,
+      klines,
       source: sourceNames.length === 1 ? (sourceNames[0] ?? "多源") : "多源",
       diagnostics,
+      ...(hasKlinesByCode ? { klinesByCode } : {}),
     }
   }
+}
+
+function toKlineBars(rawKlines: readonly StockApiKline[]): KlineBar[] {
+  const bars: KlineBar[] = []
+  for (const kline of rawKlines) {
+    if (Number.isFinite(kline.close) && kline.close > 0) {
+      bars.push({
+        date: kline.date,
+        open: kline.open,
+        close: kline.close,
+        high: kline.high,
+        low: kline.low,
+        ...(typeof kline.volume === "number" ? { volume: kline.volume } : {}),
+      })
+    }
+  }
+  return bars
 }
 
 export function createDefaultMarketDataSource(

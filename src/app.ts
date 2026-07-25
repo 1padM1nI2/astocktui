@@ -106,7 +106,10 @@ export class MarketIntelligenceApp implements Component {
       promptAgent: (input) => void this.#agent.prompt(input),
       refreshMarket: () => void this.refreshMarket(),
       refreshNews: () => void this.refreshNews(),
-      handleNewsInput: (input) => this.#news.handleInput(input),
+      handleNewsInput: (input) => {
+        this.#news.handleInput(input)
+        void this.#news.loadSelectedArticle().then(() => this.onUpdate())
+      },
       handleMarketInput: (input) => this.#market.handleInput(input),
       handlePortfolioInput: (input) => this.#portfolio.handleInput(input),
       handleTradeInput: (input) => this.#tradeHistory.handleInput(input),

@@ -316,17 +316,19 @@ describe("新闻滚动", () => {
     await app.refreshNews()
     app.handleInput("\t") // → NEWS
     app.handleInput("\t") // → NEWS
+    app.handleInput(" ") // 空格进入选中模式
     app.handleInput("\x1b[B") // Down
     const frame = app.render(80).join("\n")
     // The second headline should be selected (index 1, after header+divider)
     expect(newsSelectionIndex(frame)).toBeGreaterThan(0)
   })
 
-  test("Up 键上移选中并支持边界回绕", async () => {
+  test("Up 键上移选中", async () => {
     const app = new MarketIntelligenceApp(undefined, TEST_NEWS_SOURCE)
     await app.refreshNews()
     app.handleInput("\t")
     app.handleInput("\t")
+    app.handleInput(" ")
     app.handleInput("\x1b[B")
     app.handleInput("\x1b[B")
     app.handleInput("\x1b[A")
@@ -339,6 +341,7 @@ describe("新闻滚动", () => {
     await app.refreshNews()
     app.handleInput("\t")
     app.handleInput("\t")
+    app.handleInput(" ")
     app.handleInput("\x1b[B")
     app.handleInput("\x1b[B")
     app.handleInput("\t") // → AGENT

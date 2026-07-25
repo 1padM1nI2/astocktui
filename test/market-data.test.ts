@@ -28,7 +28,7 @@ function clientWith(
 describe("stock-api 行情适配", () => {
   test("映射实时价格、百分比、来源和 K 线收盘价", async () => {
     let requestedCodes: readonly string[] = []
-    let requestedKline = ""
+    const klineRequests: string[] = []
     const client: StockApiClient = {
       async getStocks(codes): Promise<readonly StockApiQuote[]> {
         requestedCodes = codes
@@ -57,8 +57,11 @@ describe("stock-api 行情适配", () => {
         ]
       },
       async getKlines(code, options): Promise<readonly StockApiKline[]> {
-        requestedKline = `${code}:${options?.period}:${options?.count}`
-        return [{ close: 1470 }, { close: 1488.88 }]
+        klineRequests.push(`${code}:${options?.period}:${options?.count}`)
+        if (code === "SZ000858") {
+          return [{ date: "2026-01-01", open: 127, close: 128.5, high: 130, low: 126 }]
+        }
+        return [{ date: "2026-01-01", open: 1460, close: 1470, high: 1475, low: 1455 }, { date: "2026-01-02", open: 1470, close: 1488.88, high: 1490, low: 1465 }]
       },
     }
 
@@ -68,7 +71,7 @@ describe("stock-api 行情适配", () => {
     ])
 
     expect(requestedCodes).toEqual(["SH600519", "SZ000858"])
-    expect(requestedKline).toBe("SH600519:day:24")
+    expect(klineRequests).toEqual(["SH600519:day:60", "SZ000858:day:60"])
     expect(snapshot).toEqual({
       quotes: [
         {
@@ -78,6 +81,9 @@ describe("stock-api 行情适配", () => {
           changePercent: 1.21,
           source: "tencent",
           volume: 12_345,
+          high: 1499,
+          low: 1460,
+          prevClose: 1471.08,
         },
         {
           code: "SZ000858",
@@ -85,9 +91,23 @@ describe("stock-api 行情适配", () => {
           price: 128.5,
           changePercent: -0.85,
           source: "tencent",
+          high: 130,
+          low: 127,
+          prevClose: 129.6,
         },
       ],
       trend: [1470, 1488.88],
+      klines: [
+        { date: "2026-01-01", open: 1460, close: 1470, high: 1475, low: 1455 },
+        { date: "2026-01-02", open: 1470, close: 1488.88, high: 1490, low: 1465 },
+      ],
+      klinesByCode: {
+        SH600519: [
+          { date: "2026-01-01", open: 1460, close: 1470, high: 1475, low: 1455 },
+          { date: "2026-01-02", open: 1470, close: 1488.88, high: 1490, low: 1465 },
+        ],
+        SZ000858: [{ date: "2026-01-01", open: 127, close: 128.5, high: 130, low: 126 }],
+      },
       source: "tencent",
     })
   })
@@ -115,7 +135,50 @@ describe("stock-api 行情适配", () => {
 
     expect(snapshot.quotes).toHaveLength(1)
     expect(snapshot.trend).toEqual([])
+    expect(snapshot.klinesByCode).toEqual({})
     expect(snapshot.source).toBe("sina")
+  })
+
+  test("单只 K 线失败不影响其他股票的 K 线", async () => {
+    const client: StockApiClient = {
+      async getStocks(): Promise<readonly StockApiQuote[]> {
+        return [
+          {
+            code: "SH600519",
+            name: "贵州茅台",
+            now: 1488.88,
+            percent: 0.0121,
+            low: 1460,
+            high: 1499,
+            yesterday: 1471.08,
+            source: "tencent",
+          },
+          {
+            code: "SZ000858",
+            name: "五粮液",
+            now: 128.5,
+            percent: -0.0085,
+            low: 127,
+            high: 130,
+            yesterday: 129.6,
+            source: "tencent",
+          },
+        ]
+      },
+      async getKlines(code): Promise<readonly StockApiKline[]> {
+        if (code === "SH600519") throw new Error("K 线暂不可用")
+        return [{ date: "2026-01-01", open: 127, close: 128.5, high: 130, low: 126 }]
+      },
+    }
+
+    const snapshot = await new StockApiMarketDataSource(client).loadSnapshot([
+      "SH600519",
+      "SZ000858",
+    ])
+
+    expect(snapshot.klinesByCode).toEqual({
+      SZ000858: [{ date: "2026-01-01", open: 127, close: 128.5, high: 130, low: 126 }],
+    })
   })
 
   test("拒绝上游空结果和 base 占位数据", async () => {
@@ -270,6 +333,57 @@ test("复合行情源将失败市场保留为诊断而不阻断成功市场", as
 
   expect(snapshot.quotes.map((quote) => quote.code)).toEqual(["SH600519"])
   expect(snapshot.diagnostics).toEqual([expect.objectContaining({ code: "US:AAPL", market: "US" })])
+})
+
+test("复合行情源合并各市场的按代码 K 线", async () => {
+  const local: MarketDataSource = {
+    async loadSnapshot(): Promise<MarketSnapshot> {
+      return {
+        quotes: [
+          { code: "SH600519", name: "贵州茅台", price: 100, changePercent: 1, source: "local" },
+        ],
+        trend: [99, 100],
+        klines: [{ date: "2026-01-02", open: 99, close: 100, high: 101, low: 98 }],
+        klinesByCode: {
+          SH600519: [{ date: "2026-01-02", open: 99, close: 100, high: 101, low: 98 }],
+        },
+        source: "local",
+      }
+    },
+  }
+  const global: MarketDataSource = {
+    async loadSnapshot(): Promise<MarketSnapshot> {
+      return {
+        quotes: [
+          {
+            code: "US:AAPL",
+            name: "Apple",
+            price: 210,
+            changePercent: 1.2,
+            source: "yahoo",
+            market: "US",
+            currency: "USD",
+          },
+        ],
+        trend: [209, 210],
+        klinesByCode: {
+          "US:AAPL": [{ date: "2026-01-02", open: 208, close: 210, high: 211, low: 207 }],
+        },
+        source: "yahoo",
+      }
+    },
+  }
+
+  const snapshot = await new CompositeMarketDataSource(local, global).loadSnapshot([
+    "SH600519",
+    "US:AAPL",
+  ])
+
+  expect(snapshot.klinesByCode).toEqual({
+    SH600519: [{ date: "2026-01-02", open: 99, close: 100, high: 101, low: 98 }],
+    "US:AAPL": [{ date: "2026-01-02", open: 208, close: 210, high: 211, low: 207 }],
+  })
+  expect(snapshot.klines).toEqual([{ date: "2026-01-02", open: 99, close: 100, high: 101, low: 98 }])
 })
 
 test("默认行情源通过复合源保留现有 A 股源并接入全球源", async () => {

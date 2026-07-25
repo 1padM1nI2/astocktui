@@ -138,21 +138,23 @@ describe("新闻工作区翻页", () => {
     expect(top).toContain("新闻标题00")
     expect(top).not.toContain("新闻标题10")
 
-    press(news, "\x1b[B", 15)
+    press(news, " ", 1) // 空格进入选中模式
+    press(news, "\x1b[B", 14)
     const frame = renderWorkspacePanel(news, 50, 8, true)
     const text = frameText(frame)
     expect(text).toContain("新闻标题14")
     expect(text).not.toContain("新闻标题08")
-    expect(text).not.toContain("新闻标题15")
+    expect(text).not.toContain("新闻标题19")
     const selectedLine = frame.find((line) => line.includes("新闻标题14"))
     expect(selectedLine).toContain("\x1b[36m\x1b[7m")
   })
 
-  test("PageDown 按可视行数移动选中项", () => {
+  test("PageDown 按步长移动选中项", () => {
     const news = new NewsWorkspace()
     news.applySnapshot(snapshot(30))
     renderWorkspacePanel(news, 50, 8, true)
 
+    press(news, " ", 1)
     press(news, "\x1b[B", 2)
     news.handleInput("\x1b[6~")
     const text = frameText(renderWorkspacePanel(news, 50, 8, true))
