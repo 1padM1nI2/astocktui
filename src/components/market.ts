@@ -1,131 +1,48 @@
 import type { Component } from "@oh-my-pi/pi-tui"
-import { matchesKey } from "@oh-my-pi/pi-tui"
 import { ANSI } from "../colors"
 import type { MarketQuote, MarketSnapshot } from "../market-data"
 import { DEFAULT_WATCHLIST, DEFAULT_WATCHLIST_CODES } from "../market-data"
-import { alignCell, fitLine } from "../width"
-import { ListScrollState } from "../workspace-scroll"
+import { MarketSelectionController } from "../market-selection"
+import { fitLine } from "../width"
+import type { ListScrollState } from "../workspace-scroll"
+import { renderMarketDetail } from "./market-detail"
+import {
+  displayCode,
+  marketLabel,
+  renderFullTableRow,
+  renderTableRow,
+  stateLabel,
+} from "./market-table"
 import { renderFocusStats, renderMiniSparkline, renderSparkline, trendColor } from "./market-trend"
 
 const DEFAULT_NAMES = new Map(DEFAULT_WATCHLIST.map((item) => [item.code, item.name]))
-
-const CODE_WIDTH = 6
-const NAME_WIDTH = 10
-const PRICE_WIDTH = 10
-const CHANGE_WIDTH = 9
-const TABLE_GAP = "  "
-const FULL_CODE_WIDTH = 9
-const MARKET_WIDTH = 8
-const STATE_WIDTH = 6
-const MINI_SPARK_WIDTH = 12
-
-function displayCode(code: string): string {
-  return /^(?:SH|SZ)\d{6}$/u.test(code)
-    ? code.slice(2)
-    : code.startsWith("US:") || code.startsWith("JP:") || code.startsWith("KR:")
-      ? code.slice(3)
-      : code
-}
-
-function marketLabel(quote: MarketQuote | undefined, code: string): string {
-  const market =
-    quote?.market ??
-    (code.startsWith("US:")
-      ? "US"
-      : code.startsWith("JP:")
-        ? "JP"
-        : code.startsWith("KR:")
-          ? "KR"
-          : "CN")
-  const currency =
-    quote?.currency ??
-    (market === "US" ? "USD" : market === "JP" ? "JPY" : market === "KR" ? "KRW" : "CNY")
-  return `${market} ${currency}`
-}
-
-function stateLabel(quote: MarketQuote | undefined): string {
-  if (quote?.marketState === "open") return "交易中"
-  if (quote?.marketState === "closed") return "已收盘"
-  if (quote?.marketState === "delayed") return "延迟"
-  return "--"
-}
-
-function renderFullTableRow(cells: readonly string[], width: number): string {
-  const columns = [
-    FULL_CODE_WIDTH,
-    MARKET_WIDTH,
-    NAME_WIDTH,
-    PRICE_WIDTH,
-    CHANGE_WIDTH,
-    MINI_SPARK_WIDTH,
-    STATE_WIDTH,
-  ]
-  return fitLine(
-    cells
-      .map((cell, index) =>
-        alignCell(cell, columns[index] ?? NAME_WIDTH, index < 3 || index === 5 ? "left" : "right"),
-      )
-      .join(TABLE_GAP),
-    width,
-  )
-}
-
-function renderTableRow(
-  code: string,
-  name: string,
-  price: string,
-  change: string,
-  width: number,
-): string {
-  const row =
-    `${alignCell(code, CODE_WIDTH, "left")}${TABLE_GAP}` +
-    `${alignCell(name, NAME_WIDTH, "left")}${TABLE_GAP}` +
-    `${alignCell(price, PRICE_WIDTH, "right")}${TABLE_GAP}` +
-    alignCell(change, CHANGE_WIDTH, "right")
-  return fitLine(row, width)
-}
 
 export class MarketWorkspace implements Component {
   #snapshot: MarketSnapshot | null = null
   #status: "idle" | "loading" | "ready" | "error" = "idle"
   #quotesByCode: Readonly<Record<string, MarketQuote>> = {}
   #watchlistCodes: readonly string[]
-  #selectedIndex = 0
-  #rowsStartLine = 4
-  readonly #scroll = new ListScrollState()
+  readonly #selection = new MarketSelectionController()
 
   constructor(codes: readonly string[] = DEFAULT_WATCHLIST_CODES) {
     this.#watchlistCodes = [...codes]
   }
 
   get scroll(): ListScrollState {
-    return this.#scroll
+    return this.#selection.scroll
   }
 
-  get selectedCode(): string | undefined {
-    return this.#watchlistCodes[this.#selectedIndex]
+  get isInDetailMode(): boolean {
+    return this.#selection.isInDetailMode
   }
 
   handleInput(data: string): boolean {
-    const count = this.#watchlistCodes.length
-    if (count === 0) return this.#scroll.handleInput(data)
-    if (matchesKey(data, "up")) this.#selectedIndex = Math.max(0, this.#selectedIndex - 1)
-    else if (matchesKey(data, "down"))
-      this.#selectedIndex = Math.min(count - 1, this.#selectedIndex + 1)
-    else if (matchesKey(data, "pageUp"))
-      this.#selectedIndex = Math.max(0, this.#selectedIndex - this.#scroll.viewportRows)
-    else if (matchesKey(data, "pageDown"))
-      this.#selectedIndex = Math.min(count - 1, this.#selectedIndex + this.#scroll.viewportRows)
-    else if (matchesKey(data, "home")) this.#selectedIndex = 0
-    else if (matchesKey(data, "end")) this.#selectedIndex = count - 1
-    else return false
-    this.#scroll.ensureVisible(this.#rowsStartLine - 2 + this.#selectedIndex)
-    return true
+    return this.#selection.handleInput(data)
   }
 
   setWatchlist(codes: readonly string[]): void {
     this.#watchlistCodes = [...codes]
-    this.#selectedIndex = Math.min(this.#selectedIndex, Math.max(0, codes.length - 1))
+    this.#selection.recordItemCount(codes.length)
   }
   get status(): "idle" | "loading" | "ready" | "error" {
     return this.#status
@@ -158,6 +75,8 @@ export class MarketWorkspace implements Component {
     const quotesByCode: Record<string, MarketQuote> = {}
     for (const quote of snapshot.quotes) quotesByCode[quote.code] = quote
     this.#quotesByCode = quotesByCode
+    this.#selection.recordItemCount(this.#watchlistCodes.length)
+    this.#selection.markReady()
     this.#status = "ready"
   }
 
@@ -178,8 +97,28 @@ export class MarketWorkspace implements Component {
     const lines: string[] = []
     const hasGlobal = this.#watchlistCodes.some((code) => code.includes(":"))
     const expanded = safeWidth >= 64
-    lines.push(fitLine(`行情 / ${hasGlobal ? "全球股票" : "沪深A股"} 实时 ${status}`, safeWidth))
+
+    if (this.#selection.isInDetailMode) {
+      const code = this.#watchlistCodes[this.#selection.selectedIndex]
+      if (code !== undefined) {
+        const quote = this.#quotesByCode[code]
+        return renderMarketDetail({
+          code,
+          name: quote?.name ?? DEFAULT_NAMES.get(code) ?? code,
+          quote,
+          klines: this.#snapshot?.klinesByCode?.[code],
+          width: safeWidth,
+          header: fitLine(`行情 / ${hasGlobal ? "全球股票" : "沪深A股"} 实时 ${status}`, safeWidth),
+          marketLabel: marketLabel(quote, code),
+          stateLabel: stateLabel(quote),
+        })
+      }
+    }
+
+    const header = fitLine(`行情 / ${hasGlobal ? "全球股票" : "沪深A股"} 实时 ${status}`, safeWidth)
+    lines.push(header)
     lines.push("─".repeat(safeWidth))
+
     lines.push(renderSparkline(this.#snapshot?.trend ?? [], safeWidth))
     lines.push(...renderFocusStats(this.#quotesByCode[this.#watchlistCodes[0] ?? ""], safeWidth))
     lines.push(
@@ -190,9 +129,10 @@ export class MarketWorkspace implements Component {
           )
         : renderTableRow("代码", "名称", "现价", "涨跌幅", safeWidth),
     )
-    this.#rowsStartLine = lines.length
+    this.#selection.setHeaderRows(lines.length - 2)
     for (const [rowIndex, code] of this.#watchlistCodes.entries()) {
-      const selected = rowIndex === this.#selectedIndex
+      const selected =
+        this.#selection.isInSelectionMode && rowIndex === this.#selection.selectedIndex
       const quote = this.#quotesByCode[code]
       if (quote === undefined) {
         const row = expanded
@@ -215,7 +155,7 @@ export class MarketWorkspace implements Component {
               "--",
               safeWidth,
             )
-        lines.push(selected ? `${ANSI.reverse}${row}${ANSI.reset}` : row)
+        lines.push(selected ? `${ANSI.cyan}${ANSI.reverse}${row}${ANSI.reset}` : row)
         continue
       }
       const sign = quote.changePercent > 0 ? "+" : ""
@@ -242,7 +182,7 @@ export class MarketWorkspace implements Component {
             change,
             safeWidth,
           )
-      lines.push(selected ? `${ANSI.reverse}${row}${ANSI.reset}` : row)
+      lines.push(selected ? `${ANSI.cyan}${ANSI.reverse}${row}${ANSI.reset}` : row)
     }
     return lines
   }

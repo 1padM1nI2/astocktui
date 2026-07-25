@@ -12,3 +12,22 @@ export function alignCell(text: string, width: number, alignment: CellAlignment)
   const padding = " ".repeat(Math.max(0, safeWidth - visibleWidth(fitted)))
   return alignment === "right" ? `${padding}${fitted}` : `${fitted}${padding}`
 }
+
+export function wrapText(text: string, width: number): string[] {
+  const safeWidth = Math.max(1, width | 0)
+  const lines: string[] = []
+  let current = ""
+  for (const char of text) {
+    if (char === "\n") {
+      lines.push(current)
+      current = ""
+    } else if (current.length > 0 && visibleWidth(current + char) > safeWidth) {
+      lines.push(current)
+      current = char
+    } else {
+      current += char
+    }
+  }
+  lines.push(current)
+  return lines
+}

@@ -47,9 +47,19 @@ export interface MarketDataDiagnostic {
   readonly message: string
 }
 
+export interface KlineBar {
+  readonly date: string
+  readonly open: number
+  readonly close: number
+  readonly high: number
+  readonly low: number
+  readonly volume?: number
+}
+
 export interface MarketSnapshot {
   readonly quotes: readonly MarketQuote[]
   readonly trend: readonly number[]
+  readonly klinesByCode?: Readonly<Record<string, readonly KlineBar[]>>
   readonly source: string
   readonly diagnostics?: readonly MarketDataDiagnostic[]
 }
@@ -87,6 +97,19 @@ export interface StockApiKlineOptions {
 export interface StockApiClient {
   getStocks(codes: string[]): Promise<readonly StockApiQuote[]>
   getKlines(code: string, options?: StockApiKlineOptions): Promise<readonly StockApiKline[]>
+}
+
+export function toKlineBars(klines: readonly StockApiKline[]): readonly KlineBar[] {
+  return klines
+    .filter((kline) => Number.isFinite(kline.close) && kline.close > 0)
+    .map((kline) => ({
+      date: kline.date ?? "",
+      open: typeof kline.open === "number" && kline.open > 0 ? kline.open : kline.close,
+      close: kline.close,
+      high: typeof kline.high === "number" && kline.high > 0 ? kline.high : kline.close,
+      low: typeof kline.low === "number" && kline.low > 0 ? kline.low : kline.close,
+      ...(typeof kline.volume === "number" && kline.volume > 0 ? { volume: kline.volume } : {}),
+    }))
 }
 
 const KLINE_CACHE_TTL_MS = 5 * 60_000
@@ -189,14 +212,21 @@ export class StockApiMarketDataSource implements MarketDataSource {
     const focusTrend = (klinesByCode.get(focusCode) ?? [])
       .filter((kline) => Number.isFinite(kline.close) && kline.close > 0)
       .map((kline) => kline.close)
-    return { quotes, trend: focusTrend, source: snapshotSource }
+    return {
+      quotes,
+      trend: focusTrend,
+      klinesByCode: Object.fromEntries(
+        codes.map((code) => [code, toKlineBars(klinesByCode.get(code) ?? [])]),
+      ),
+      source: snapshotSource,
+    }
   }
 
   async #loadKlines(code: string): Promise<readonly StockApiKline[]> {
     const cached = this.#klineCache.get(code)
     if (cached !== undefined && this.#now() - cached.at < KLINE_CACHE_TTL_MS) return cached.klines
     const klines = await this.#client
-      .getKlines(code, { period: "day", count: 24 })
+      .getKlines(code, { period: "day", count: 60 })
       .catch((): readonly StockApiKline[] => [])
     this.#klineCache.set(code, { at: this.#now(), klines })
     return klines
@@ -241,10 +271,13 @@ export class CompositeMarketDataSource implements MarketDataSource {
       snapshots.find((snapshot) => snapshot.quotes.some((quote) => quote.code === focus))?.trend ??
       []
     const diagnostics = snapshots.flatMap((snapshot) => snapshot.diagnostics ?? [])
+    const klinesByCode: Record<string, readonly KlineBar[]> = {}
+    for (const snapshot of snapshots) Object.assign(klinesByCode, snapshot.klinesByCode)
     const sourceNames = [...new Set(quotes.map((quote) => quote.source))]
     return {
       quotes,
       trend,
+      klinesByCode,
       source: sourceNames.length === 1 ? (sourceNames[0] ?? "多源") : "多源",
       diagnostics,
     }

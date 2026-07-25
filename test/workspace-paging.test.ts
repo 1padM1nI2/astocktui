@@ -24,43 +24,40 @@ function press(
 describe("行情工作区翻页", () => {
   const codes = Array.from({ length: 20 }, (_, index) => `SH6000${String(index).padStart(2, "0")}`)
 
-  test("上下键移动选中光标，视图跟随且选中行反色", () => {
+  test("空格进入选中模式，上下键移动光标且视图跟随", () => {
     const market = new MarketWorkspace(codes)
-    expect(market.selectedCode).toBe(codes[0])
+    market.applySnapshot({ quotes: [], trend: [], source: "test" })
 
     const top = frameText(renderWorkspacePanel(market, 40, 8, true))
     expect(top).toContain("600000")
     expect(top).not.toContain("600005")
 
+    // 滚动模式下空格进入选中模式（无需行情也可选中行）
+    market.handleInput(" ")
     press(market, "\x1b[B", 4)
-    expect(market.selectedCode).toBe(codes[4])
     const scrolled = renderWorkspacePanel(market, 40, 8, true)
-    const scrolledText = frameText(scrolled)
-    expect(scrolledText).toContain("600004")
-    const selectedLine = scrolled.find((line) => line.includes("600004")) ?? ""
-    expect(selectedLine).toContain("\x1b[7m")
-    const idleLine = scrolled.find((line) => line.includes("600003")) ?? ""
-    expect(idleLine).not.toContain("\x1b[7m")
+    const selectedLine = scrolled.find((line) => line.includes("\x1b[7m")) ?? ""
+    expect(selectedLine).toContain("600004")
 
     press(market, "\x1b[A", 4)
-    expect(market.selectedCode).toBe(codes[0])
-    const restored = frameText(renderWorkspacePanel(market, 40, 8, true))
-    expect(restored).toContain("600000")
+    const restored = renderWorkspacePanel(market, 40, 8, true)
+    expect(frameText(restored)).toContain("600000")
   })
 
-  test("PageDown 与 PageUp 按面板高度移动光标翻页", () => {
+  test("选中模式下 PageDown 与 PageUp 移动光标", () => {
     const market = new MarketWorkspace(codes)
+    market.applySnapshot({ quotes: [], trend: [], source: "test" })
 
+    market.handleInput(" ")
     renderWorkspacePanel(market, 40, 8, true)
     market.handleInput("\x1b[6~")
-    expect(market.selectedCode).not.toBe(codes[0])
     const paged = renderWorkspacePanel(market, 40, 8, true)
-    expect(paged.some((line) => line.includes("\x1b[7m"))).toBe(true)
+    const selected = paged.find((line) => line.includes("\x1b[7m")) ?? ""
+    expect(selected).not.toContain("600000")
 
     market.handleInput("\x1b[5~")
-    expect(market.selectedCode).toBe(codes[0])
-    const back = frameText(renderWorkspacePanel(market, 40, 8, true))
-    expect(back).toContain("600000")
+    const back = renderWorkspacePanel(market, 40, 8, true)
+    expect(frameText(back)).toContain("600000")
   })
 })
 
@@ -146,21 +143,23 @@ describe("新闻工作区翻页", () => {
     expect(top).toContain("新闻标题00")
     expect(top).not.toContain("新闻标题10")
 
-    press(news, "\x1b[B", 15)
+    press(news, " ", 1) // 空格进入选中模式
+    press(news, "\x1b[B", 14)
     const frame = renderWorkspacePanel(news, 50, 8, true)
     const text = frameText(frame)
     expect(text).toContain("新闻标题14")
     expect(text).not.toContain("新闻标题08")
-    expect(text).not.toContain("新闻标题15")
+    expect(text).not.toContain("新闻标题19")
     const selectedLine = frame.find((line) => line.includes("新闻标题14"))
     expect(selectedLine).toContain("\x1b[36m\x1b[7m")
   })
 
-  test("PageDown 按可视行数移动选中项", () => {
+  test("PageDown 按步长移动选中项", () => {
     const news = new NewsWorkspace()
     news.applySnapshot(snapshot(30))
     renderWorkspacePanel(news, 50, 8, true)
 
+    press(news, " ", 1)
     press(news, "\x1b[B", 2)
     news.handleInput("\x1b[6~")
     const text = frameText(renderWorkspacePanel(news, 50, 8, true))

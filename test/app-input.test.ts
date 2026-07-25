@@ -7,24 +7,48 @@ function inputFixture(): {
   readonly handler: AppInputHandler
   readonly prompt: CommandPrompt
   readonly marketKeys: string[]
+  readonly newsKeys: string[]
   readonly portfolioKeys: string[]
   readonly tradeKeys: string[]
   readonly executed: string[]
+  quits: number
+  marketConsume: boolean
+  newsConsume: boolean
   tab: number
   setTab(tab: number): void
 } {
   const prompt = new CommandPrompt()
   const marketKeys: string[] = []
+  const newsKeys: string[] = []
   const portfolioKeys: string[] = []
   const tradeKeys: string[] = []
   const executed: string[] = []
-  const state = { tab: 0 }
+  const state = { tab: 0, quits: 0, marketConsume: true, newsConsume: true }
   return {
     prompt,
     marketKeys,
+    newsKeys,
     portfolioKeys,
     tradeKeys,
     executed,
+    get quits() {
+      return state.quits
+    },
+    set quits(value: number) {
+      state.quits = value
+    },
+    get marketConsume() {
+      return state.marketConsume
+    },
+    set marketConsume(value: boolean) {
+      state.marketConsume = value
+    },
+    get newsConsume() {
+      return state.newsConsume
+    },
+    set newsConsume(value: boolean) {
+      state.newsConsume = value
+    },
     get tab() {
       return state.tab
     },
@@ -45,11 +69,13 @@ function inputFixture(): {
       promptAgent: () => {},
       refreshMarket: () => {},
       refreshNews: () => {},
-      selectedMarketCode: () => "SH600519",
-      handleNewsInput: () => {},
+      handleNewsInput: (data) => {
+        newsKeys.push(data)
+        return state.newsConsume
+      },
       handleMarketInput: (data) => {
         marketKeys.push(data)
-        return true
+        return state.marketConsume
       },
       handlePortfolioInput: (data) => {
         portfolioKeys.push(data)
@@ -59,7 +85,9 @@ function inputFixture(): {
         tradeKeys.push(data)
         return true
       },
-      onQuit: () => {},
+      onQuit: () => {
+        state.quits++
+      },
       onUpdate: () => {},
     }),
   }
@@ -99,16 +127,27 @@ test("粘贴的命令保留为可编辑命令而不立即执行", () => {
   expect(fixture.prompt.view.isPaletteOpen).toBe(true)
 })
 
-test("行情页按空格或回车打开选中个股详情并切换到 Agent", () => {
+test("行情页 Esc 先交由工作区退出详情，未消费才退出应用", () => {
   const fixture = inputFixture()
 
-  fixture.handler.handle(" ")
-  expect(fixture.executed).toEqual(["/quote SH600519"])
-  expect(fixture.tab).toBe(3)
-  expect(fixture.marketKeys).toEqual([])
+  fixture.handler.handle("\x1b")
+  expect(fixture.marketKeys).toEqual(["\x1b"])
+  expect(fixture.quits).toEqual(0)
 
-  fixture.setTab(0)
-  fixture.handler.handle("\r")
-  expect(fixture.executed).toEqual(["/quote SH600519", "/quote SH600519"])
-  expect(fixture.tab).toBe(3)
+  fixture.marketConsume = false
+  fixture.handler.handle("\x1b")
+  expect(fixture.quits).toEqual(1)
+})
+
+test("新闻页 Esc 先交由工作区退出详情，未消费才退出应用", () => {
+  const fixture = inputFixture()
+  fixture.setTab(2)
+
+  fixture.handler.handle("\x1b")
+  expect(fixture.newsKeys).toEqual(["\x1b"])
+  expect(fixture.quits).toEqual(0)
+
+  fixture.newsConsume = false
+  fixture.handler.handle("\x1b")
+  expect(fixture.quits).toEqual(1)
 })

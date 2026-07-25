@@ -97,7 +97,7 @@ describe("stock-api 行情适配", () => {
     }).loadSnapshot(["SH600519", "SZ000858"])
 
     expect(requestedCodes).toEqual(["SH600519", "SZ000858"])
-    expect(klineCalls.sort()).toEqual(["SH600519:day:24", "SZ000858:day:24"])
+    expect(klineCalls.sort()).toEqual(["SH600519:day:60", "SZ000858:day:60"])
     expect(snapshot).toEqual({
       quotes: [
         {
@@ -137,6 +137,22 @@ describe("stock-api 行情适配", () => {
         },
       ],
       trend: [1470, 1488.88],
+      klinesByCode: {
+        SH600519: [
+          { date: "2026-07-21", open: 1465, close: 1470, high: 1475, low: 1460, volume: 60_000 },
+          {
+            date: "2026-07-22",
+            open: 1480,
+            close: 1488.88,
+            high: 1499,
+            low: 1460,
+            volume: 65_181,
+          },
+        ],
+        SZ000858: [
+          { date: "2026-07-22", open: 121, close: 120, high: 130, low: 119, volume: 30_000 },
+        ],
+      },
       source: "tencent",
     })
   })

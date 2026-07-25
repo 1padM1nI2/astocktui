@@ -12,8 +12,7 @@ export interface AppInputOptions {
   readonly promptAgent: (input: string) => unknown
   readonly refreshMarket: () => unknown
   readonly refreshNews: () => unknown
-  readonly selectedMarketCode: () => string | undefined
-  readonly handleNewsInput: (data: string) => unknown
+  readonly handleNewsInput: (data: string) => boolean
   readonly handleMarketInput: (data: string) => boolean
   readonly handlePortfolioInput: (data: string) => boolean
   readonly handleTradeInput: (data: string) => boolean
@@ -48,7 +47,10 @@ export class AppInputHandler {
       options.prompt.openPalette()
       return
     }
+    if (options.activeTab() === NEWS && data === "\x1b" && options.handleNewsInput(data)) return
     if (options.activeTab() !== AGENT && (data === "q" || data === "\x1b")) {
+      if (data === "\x1b" && options.activeTab() === MARKET && options.handleMarketInput(data))
+        return
       options.onQuit()
       return
     }
@@ -79,14 +81,6 @@ export class AppInputHandler {
     }
     if (data === "\x1b[Z" || data === "\x1b[D") {
       options.setActiveTab((options.activeTab() - 1 + TAB_COUNT) % TAB_COUNT)
-      return
-    }
-    if (options.activeTab() === MARKET && (data === " " || data === "\r" || data === "\n")) {
-      const code = options.selectedMarketCode()
-      if (code !== undefined) {
-        options.setActiveTab(AGENT)
-        options.executeCommand(`/quote ${code}`)
-      }
       return
     }
     if (options.activeTab() === MARKET && options.handleMarketInput(data)) return
