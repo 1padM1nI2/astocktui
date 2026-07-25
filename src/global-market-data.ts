@@ -87,6 +87,7 @@ function parseChart(
     throw new Error("上游报价无效")
   }
   const rawTimestamp = number(meta["regularMarketTime"])
+  const trend = closes(result)
   return {
     quote: {
       code,
@@ -97,9 +98,10 @@ function parseChart(
       market: parsed.market,
       currency,
       marketState: marketState(string(meta["marketState"])),
+      ...(trend.length === 0 ? {} : { trend }),
       asOf: rawTimestamp === undefined ? null : Math.round(rawTimestamp * 1_000),
     },
-    trend: closes(result),
+    trend,
   }
 }
 

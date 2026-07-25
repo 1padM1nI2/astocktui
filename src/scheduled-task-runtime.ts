@@ -6,6 +6,7 @@ import { ScheduledTaskStore } from "./scheduled-task-store"
 export function createScheduledTaskService(
   sink: AgentEventSink,
   timer?: RefreshScheduler,
+  store?: ScheduledTaskStore,
 ): ScheduledTaskService {
-  return new ScheduledTaskService({ sink, store: new ScheduledTaskStore(), timer })
+  return new ScheduledTaskService({ sink, store: store ?? new ScheduledTaskStore(), timer })
 }

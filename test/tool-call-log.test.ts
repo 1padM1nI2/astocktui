@@ -49,6 +49,26 @@ describe("工具调用日志", () => {
     }
   })
 
+  test("通用事件写入 kind 与字段", () => {
+    const directory = tempDir()
+    try {
+      const path = join(directory, "tools.log")
+      const logger = new ToolCallLogger(path)
+
+      logger.recordEvent("agent_fallback", { from: "openai/a", to: "deepseek/b", reason: "429" })
+
+      const line = readLines(path)[0]
+      expect(line).toMatchObject({
+        phase: "event",
+        kind: "agent_fallback",
+        from: "openai/a",
+        to: "deepseek/b",
+      })
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
   test("没有匹配开始的结束记录不带耗时", () => {
     const directory = tempDir()
     try {

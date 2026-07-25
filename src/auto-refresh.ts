@@ -12,7 +12,7 @@ export interface AutoRefreshOptions {
   readonly scheduler?: RefreshScheduler | undefined
 }
 
-const DEFAULT_SCHEDULER: RefreshScheduler = {
+export const DEFAULT_SCHEDULER: RefreshScheduler = {
   setInterval(callback, intervalMs): unknown {
     const handle = setInterval(callback, intervalMs)
     handle.unref?.()

@@ -28,7 +28,7 @@ function clientWith(
 describe("stock-api 行情适配", () => {
   test("映射实时价格、百分比、来源和 K 线收盘价", async () => {
     let requestedCodes: readonly string[] = []
-    let requestedKline = ""
+    const klineCalls: string[] = []
     const client: StockApiClient = {
       async getStocks(codes): Promise<readonly StockApiQuote[]> {
         requestedCodes = codes
@@ -57,8 +57,27 @@ describe("stock-api 行情适配", () => {
         ]
       },
       async getKlines(code, options): Promise<readonly StockApiKline[]> {
-        requestedKline = `${code}:${options?.period}:${options?.count}`
-        return [{ close: 1470 }, { close: 1488.88 }]
+        klineCalls.push(`${code}:${options?.period}:${options?.count}`)
+        return code === "SH600519"
+          ? [
+              {
+                date: "2026-07-21",
+                open: 1465,
+                close: 1470,
+                high: 1475,
+                low: 1460,
+                volume: 60_000,
+              },
+              {
+                date: "2026-07-22",
+                open: 1480,
+                close: 1488.88,
+                high: 1499,
+                low: 1460,
+                volume: 65_181,
+              },
+            ]
+          : [{ date: "2026-07-22", open: 121, close: 120, high: 130, low: 119, volume: 30_000 }]
       },
     }
 
@@ -68,7 +87,7 @@ describe("stock-api 行情适配", () => {
     ])
 
     expect(requestedCodes).toEqual(["SH600519", "SZ000858"])
-    expect(requestedKline).toBe("SH600519:day:24")
+    expect(klineCalls.sort()).toEqual(["SH600519:day:24", "SZ000858:day:24"])
     expect(snapshot).toEqual({
       quotes: [
         {
@@ -78,6 +97,11 @@ describe("stock-api 行情适配", () => {
           changePercent: 1.21,
           source: "tencent",
           volume: 12_345,
+          trend: [1470, 1488.88],
+          open: 1480,
+          high: 1499,
+          low: 1460,
+          previousClose: 1471.08,
         },
         {
           code: "SZ000858",
@@ -85,11 +109,52 @@ describe("stock-api 行情适配", () => {
           price: 128.5,
           changePercent: -0.85,
           source: "tencent",
+          volume: 30_000,
+          trend: [120],
+          open: 121,
+          high: 130,
+          low: 127,
+          previousClose: 129.6,
         },
       ],
       trend: [1470, 1488.88],
       source: "tencent",
     })
+  })
+
+  test("K 线缓存有效期内不重复请求", async () => {
+    let calls = 0
+    let tick = 0
+    const client: StockApiClient = {
+      async getStocks(): Promise<readonly StockApiQuote[]> {
+        return [
+          {
+            code: "SH600519",
+            name: "贵州茅台",
+            now: 1488.88,
+            percent: 0.0121,
+            low: 1460,
+            high: 1499,
+            yesterday: 1471.08,
+            source: "tencent",
+          },
+        ]
+      },
+      async getKlines(): Promise<readonly StockApiKline[]> {
+        calls++
+        return [{ close: 1470 }]
+      },
+    }
+    const source = new StockApiMarketDataSource(client, () => tick * 60_000)
+
+    await source.loadSnapshot(["SH600519"])
+    expect(calls).toBe(1)
+    tick = 4 // 4 分钟后仍在缓存期内
+    await source.loadSnapshot(["SH600519"])
+    expect(calls).toBe(1)
+    tick = 6 // 超过 5 分钟缓存期，重新请求
+    await source.loadSnapshot(["SH600519"])
+    expect(calls).toBe(2)
   })
 
   test("K 线接口失败时仍返回实时行情", async () => {

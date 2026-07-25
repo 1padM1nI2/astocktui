@@ -67,7 +67,7 @@ test("扩展运行时合并 Skill/MCP 工具并提供状态命令", async () => 
 
   await runtime.initialize()
 
-  expect(runtime.getTools().map((tool) => tool.name)).toEqual(["read", "mcp__market_quote"])
+  expect(runtime.getTools().map((tool) => tool.name)).toEqual(["read_skill", "mcp__market_quote"])
   expect(runtime.getSystemPromptSupplement().join("\n")).toContain("Skill · valuation")
   expect(runtime.getCommands().map((command) => command.name)).toEqual(["skill:valuation"])
   const status = await runtime.mcpCommand(["list"])

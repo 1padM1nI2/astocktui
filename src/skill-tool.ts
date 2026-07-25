@@ -11,7 +11,7 @@ export function buildSkillPrompt(skills: readonly DiscoveredSkill[]): readonly s
   if (visible.length > 0) {
     prompt.push(
       [
-        "可用 Skills（需要时通过 read 工具读取 skill://<name> 或 skill://<name>/<relative-path>）：",
+        "可用 Skills（需要时通过 read_skill 工具读取 skill://<name> 或 skill://<name>/<relative-path>）：",
         ...visible.map((skill) => `- ${skill.name}: ${skill.description}`),
       ].join("\n"),
     )
@@ -26,7 +26,7 @@ export function createSkillReadTool(
   registry: SkillRegistry,
 ): AgentTool<typeof SKILL_READ_PARAMETERS> {
   return {
-    name: "read",
+    name: "read_skill",
     label: "读取 Skill",
     description: "读取已发现 Skill 的 skill:// 内容；不支持任意文件系统路径。",
     parameters: SKILL_READ_PARAMETERS,

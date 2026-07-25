@@ -1,5 +1,6 @@
 import { ProcessTerminal, TUI } from "@oh-my-pi/pi-tui"
 import { MarketIntelligenceApp } from "./app"
+import { acquireInstanceLock } from "./instance-lock"
 import type { MarketDataSource } from "./market-data"
 import type { NewsDataSource } from "./news-data"
 import { createPersistentPaperTradingService } from "./paper-account-store"
@@ -40,6 +41,14 @@ export function createDemo(
 }
 
 if (import.meta.main) {
+  const acquired = acquireInstanceLock()
+  if (!acquired.ok) {
+    console.error(
+      `AStockTUI 已在运行（PID ${acquired.pid}）。多实例会互相覆盖持仓与聊天数据，请先关闭已有实例。`,
+    )
+    process.exit(1)
+  }
+  process.on("exit", () => acquired.lock.release())
   const terminal = new ProcessTerminal()
   const tui = new TUI(terminal)
   createDemo(

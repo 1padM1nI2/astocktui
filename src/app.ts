@@ -3,13 +3,18 @@ import type { AgentController } from "./agent-controller"
 import { AgentEventDispatcher } from "./agent-event-dispatcher"
 import { AgentExtensionRuntime } from "./agent-extensions"
 import { AgentScrollState } from "./agent-scroll"
+import { buildCommandContext } from "./app-command-context"
 import { AppInputHandler } from "./app-input"
-import { refreshAppData } from "./app-refresh"
-import { MARKET, renderAppFrame, WORKSPACE_INDEX, WORKSPACE_NAMES } from "./app-render"
+import { MARKET, renderAppFrame, WORKSPACE_INDEX } from "./app-render"
 import { AutoRefreshController, type RefreshScheduler } from "./auto-refresh"
-import { AutomationRuntime } from "./automation-runtime"
+import { AutomationRuntime, type AutomationRuntimeOptions } from "./automation-runtime"
 import { CommandPrompt } from "./command-prompt"
-import { type CommandContext, executeCommand, type RefreshReport } from "./commands"
+import {
+  type CommandContext,
+  executeCommand,
+  type RefreshReport,
+  type RefreshTarget,
+} from "./commands"
 import { MarketWorkspace } from "./components/market"
 import { NewsWorkspace } from "./components/news"
 import { PortfolioWorkspace } from "./components/portfolio"
@@ -27,6 +32,10 @@ import { WatchlistService } from "./watchlist"
 import { WatchlistCoordinator } from "./watchlist-coordinator"
 
 type AgentFactory = (context: CommandContext, extensions?: AgentExtensionRuntime) => AgentController
+
+function defaultAutomation(options: AutomationRuntimeOptions): AutomationRuntime {
+  return new AutomationRuntime(options)
+}
 
 export class MarketIntelligenceApp implements Component {
   onQuit: () => void = () => process.exit(0)
@@ -64,6 +73,7 @@ export class MarketIntelligenceApp implements Component {
       createPiAgentController(context, {}, extensions),
     marketOverviewSource: MarketOverviewDataSource = new PublicMarketOverviewDataSource(),
     extensionFactory: () => AgentExtensionRuntime = () => new AgentExtensionRuntime(),
+    automation?: AutomationRuntime,
   ) {
     this.#extensions = extensionFactory()
     this.#prompt = new CommandPrompt(() => this.#extensions.getCommands())
@@ -89,11 +99,13 @@ export class MarketIntelligenceApp implements Component {
     this.#marketOverview = new MarketOverviewService(marketOverviewSource)
     this.#agent = agentFactory(this.#commandContext(), this.#extensions)
     this.#dispatcher = new AgentEventDispatcher(this.#agent)
-    this.#automation = new AutomationRuntime({
-      sink: this.#dispatcher,
-      timer: refreshScheduler,
-      lotSize: this.#trading.lotSize,
-    })
+    this.#automation =
+      automation ??
+      defaultAutomation({
+        sink: this.#dispatcher,
+        timer: refreshScheduler,
+        lotSize: this.#trading.lotSize,
+      })
     this.#input = new AppInputHandler({
       prompt: this.#prompt,
       scroll: this.#agentScroll,
@@ -184,59 +196,43 @@ export class MarketIntelligenceApp implements Component {
   }
 
   #commandContext(): CommandContext {
-    return {
+    return buildCommandContext({
       focus: (workspace) => {
         this.#activeTab = WORKSPACE_INDEX[workspace]
       },
-      refresh: (target): RefreshReport => {
-        const refreshMarket = target === "market" || target === "all"
-        const refreshNews = target === "news" || target === "all"
-        const market = refreshMarket
-          ? this.#marketRefresh === null
-            ? "started"
-            : "running"
-          : "skipped"
-        const news = refreshNews ? (this.#newsRefresh === null ? "started" : "running") : "skipped"
-        if (refreshMarket) void this.refreshMarket()
-        if (refreshNews) void this.refreshNews()
-        return { market, news }
-      },
-      systemEvents: () => this.#dispatcher,
-      conditionalOrders: () => this.#automation.conditions,
-      scheduledTasks: () => this.#automation.tasks,
-      memory: () => this.#memory,
-      refreshAndWait: (target) =>
-        refreshAppData(
-          target,
-          () => this.refreshMarket(),
-          () => this.#marketOverview.refresh(),
-          () => this.refreshNews(),
-        ),
+      refresh: (target) => this.#refreshReport(target),
+      dispatcher: () => this.#dispatcher,
+      agent: () => this.#agent,
+      automation: () => this.#automation,
+      memory: this.#memory,
+      marketOverview: this.#marketOverview,
+      market: this.#market,
+      news: this.#news,
+      trading: this.#trading,
+      watchlist: this.#watchlist,
+      portfolio: this.#portfolio,
+      extensions: this.#extensions,
+      activeTab: () => this.#activeTab,
+      refreshMarket: () => this.refreshMarket(),
+      refreshNews: () => this.refreshNews(),
       quit: () => this.onQuit(),
-      clearAgent: () => this.#agent.clear(),
-      status: () => ({
-        activeWorkspace: WORKSPACE_NAMES[this.#activeTab] ?? "market",
-        market: { state: this.#market.status, source: this.#market.source },
-        news: { state: this.#news.status, source: this.#news.source },
-        agent: this.#agent.view.status === "completed" ? "completed" : "ready",
-      }),
-      marketOverview: (refresh = false) =>
-        refresh ? this.#marketOverview.refresh() : this.#marketOverview.getOverview(),
-      marketSnapshot: () => this.#market.snapshot,
-      newsSnapshot: () => this.#news.snapshot,
-      portfolio: () => this.#trading.snapshot,
-      quote: (code) => this.#watchlist.resolveQuote(code),
-      trading: () => this.#trading,
-      portfolioChanged: () => {
-        this.#portfolio.applySnapshot(this.#trading.snapshot)
-        this.#watchlist.syncMarketCodes()
-      },
-      watchlist: () => this.#watchlist.watchlist,
-      changeWatchlist: (action, code) => this.#watchlist.change(action, code),
-      invokeSkill: (name, args) =>
-        this.#extensions.invokeSkill(name, args, (input) => void this.#agent.prompt(input)),
-      mcpCommand: (args) => this.#extensions.mcpCommand(args),
-    }
+    })
+  }
+
+  #refreshReport(target: RefreshTarget): RefreshReport {
+    const refreshMarket = target === "market" || target === "all"
+    const refreshNews = target === "news" || target === "all"
+    const market =
+      refreshMarket && this.#marketRefresh !== null
+        ? "running"
+        : refreshMarket
+          ? "started"
+          : "skipped"
+    const news =
+      refreshNews && this.#newsRefresh !== null ? "running" : refreshNews ? "started" : "skipped"
+    if (refreshMarket) void this.refreshMarket()
+    if (refreshNews) void this.refreshNews()
+    return { market, news }
   }
 
   render(width: number): readonly string[] {

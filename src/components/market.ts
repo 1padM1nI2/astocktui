@@ -4,37 +4,9 @@ import type { MarketQuote, MarketSnapshot } from "../market-data"
 import { DEFAULT_WATCHLIST, DEFAULT_WATCHLIST_CODES } from "../market-data"
 import { alignCell, fitLine } from "../width"
 import { ListScrollState } from "../workspace-scroll"
+import { renderFocusStats, renderMiniSparkline, renderSparkline, trendColor } from "./market-trend"
 
 const DEFAULT_NAMES = new Map(DEFAULT_WATCHLIST.map((item) => [item.code, item.name]))
-
-function renderSparkline(prices: readonly number[], width: number): string {
-  if (width < 20 || prices.length < 2) return fitLine("走势 无数据", width)
-  const min = Math.min(...prices)
-  const max = Math.max(...prices)
-  const labelWidth = 20
-  const barSlots = Math.max(4, width - labelWidth)
-  const step = Math.max(1, Math.floor((prices.length - 1) / barSlots))
-  let bars = ""
-  for (let i = step; i < prices.length; i += step) {
-    const prev = prices[i - step] ?? prices[i - 1] ?? 0
-    const curr = prices[i] ?? prev
-    if (curr > prev) {
-      bars += `${ANSI.red}|`
-    } else if (curr < prev) {
-      bars += `${ANSI.green}|`
-    } else {
-      bars += "|"
-    }
-  }
-  bars += ANSI.reset
-  return fitLine(`走势 ${min.toFixed(2)} ${bars} ${max.toFixed(2)}`, width)
-}
-
-function trendColor(change: number): string {
-  if (change > 0) return ANSI.red
-  if (change < 0) return ANSI.green
-  return ""
-}
 
 const CODE_WIDTH = 6
 const NAME_WIDTH = 10
@@ -44,6 +16,7 @@ const TABLE_GAP = "  "
 const FULL_CODE_WIDTH = 9
 const MARKET_WIDTH = 8
 const STATE_WIDTH = 6
+const MINI_SPARK_WIDTH = 12
 
 function displayCode(code: string): string {
   return /^(?:SH|SZ)\d{6}$/u.test(code)
@@ -83,12 +56,13 @@ function renderFullTableRow(cells: readonly string[], width: number): string {
     NAME_WIDTH,
     PRICE_WIDTH,
     CHANGE_WIDTH,
+    MINI_SPARK_WIDTH,
     STATE_WIDTH,
   ]
   return fitLine(
     cells
       .map((cell, index) =>
-        alignCell(cell, columns[index] ?? NAME_WIDTH, index < 3 ? "left" : "right"),
+        alignCell(cell, columns[index] ?? NAME_WIDTH, index < 3 || index === 5 ? "left" : "right"),
       )
       .join(TABLE_GAP),
     width,
@@ -186,9 +160,17 @@ export class MarketWorkspace implements Component {
     lines.push(fitLine(`行情 / ${hasGlobal ? "全球股票" : "沪深A股"} 实时 ${status}`, safeWidth))
     lines.push("─".repeat(safeWidth))
     lines.push(renderSparkline(this.#snapshot?.trend ?? [], safeWidth))
+    const focusStats = renderFocusStats(
+      this.#quotesByCode[this.#watchlistCodes[0] ?? ""],
+      safeWidth,
+    )
+    if (focusStats !== null) lines.push(focusStats)
     lines.push(
       expanded
-        ? renderFullTableRow(["代码", "市场/币种", "名称", "现价", "涨跌幅", "状态"], safeWidth)
+        ? renderFullTableRow(
+            ["代码", "市场/币种", "名称", "现价", "涨跌幅", "走势", "状态"],
+            safeWidth,
+          )
         : renderTableRow("代码", "名称", "现价", "涨跌幅", safeWidth),
     )
     for (const code of this.#watchlistCodes) {
@@ -201,6 +183,7 @@ export class MarketWorkspace implements Component {
                   code,
                   marketLabel(undefined, code),
                   DEFAULT_NAMES.get(code) ?? "等待行情",
+                  "--",
                   "--",
                   "--",
                   "--",
@@ -230,6 +213,7 @@ export class MarketWorkspace implements Component {
                 quote.name,
                 quote.price.toFixed(2),
                 change,
+                renderMiniSparkline(quote.trend),
                 stateLabel(quote),
               ],
               safeWidth,

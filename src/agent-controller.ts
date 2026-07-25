@@ -61,9 +61,16 @@ interface MutableToolView {
   summary?: string
 }
 
+export interface AgentModelSwitcher {
+  current(): string
+  list(): readonly string[]
+  select(target: string): string
+}
+
 export class AgentController {
   readonly #driver: AgentDriver
-  readonly #modelLabel: string
+  readonly #modelLabel: string | (() => string)
+  readonly modelSwitcher: AgentModelSwitcher | undefined
   readonly #configurationError: string | null
   readonly #listeners = new Set<() => void>()
   readonly #tools: MutableToolView[] = []
@@ -76,12 +83,14 @@ export class AgentController {
 
   constructor(
     driver: AgentDriver,
-    modelLabel: string,
+    modelLabel: string | (() => string),
     configurationError?: string,
     history: readonly AgentExchangeView[] = [],
+    modelSwitcher?: AgentModelSwitcher,
   ) {
     this.#driver = driver
     this.#modelLabel = modelLabel
+    this.modelSwitcher = modelSwitcher
     this.#configurationError = configurationError ?? null
     this.#status = configurationError === undefined ? "idle" : "unconfigured"
     this.#error = this.#configurationError
@@ -98,7 +107,7 @@ export class AgentController {
   get view(): AgentSessionView {
     return {
       status: this.#status,
-      modelLabel: this.#modelLabel,
+      modelLabel: typeof this.#modelLabel === "function" ? this.#modelLabel() : this.#modelLabel,
       userInput: this.#userInput,
       answer: this.#answer,
       tools: this.#tools.map((tool) => ({ ...tool })),

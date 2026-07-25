@@ -126,6 +126,38 @@ describe("自定义定时任务服务", () => {
     }
   })
 
+  test("未注入 timer 时 start 使用默认调度器立即触发到期任务", () => {
+    const directory = mkdtempSync(join(tmpdir(), "astocktui-scheduled-task-service-"))
+    const events: unknown[] = []
+    const service = new ScheduledTaskService({
+      now: () => now,
+      store: new ScheduledTaskStore(join(directory, "scheduled-tasks.json")),
+      sink: {
+        enqueue(event) {
+          events.push(event)
+          return "queued"
+        },
+      },
+    })
+    try {
+      now = new Date("2026-07-17T01:00:00.000Z")
+      service.create(
+        { name: "每分钟", prompt: "扫描", schedule: { kind: "interval", minutes: 1 } },
+        "user",
+      )
+      now = new Date("2026-07-17T01:01:00.000Z")
+      service.start()
+      expect(service.running).toBe(true)
+      expect(events).toHaveLength(1)
+
+      service.stop()
+      expect(service.running).toBe(false)
+    } finally {
+      service.stop()
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
   test("去重或非法输入不会留下部分状态", () => {
     const { directory, service } = fixture("deduped")
     try {

@@ -56,6 +56,8 @@ test("Skill 读取工具仅接受已发现的 skill:// 路径", async () => {
     const registry = await discoverSkills({ cwd: root, home: join(root, "home") })
     const tool = createSkillReadTool(registry)
 
+    expect(tool.name).toBe("read_skill")
+
     const success = await tool.execute("test", { path: "skill://valuation" })
     expect(success.content).toEqual([
       { type: "text", text: "---\ndescription: 估值流程\n---\n估值正文" },

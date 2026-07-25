@@ -1,4 +1,4 @@
-import type { RefreshScheduler } from "./auto-refresh"
+import { DEFAULT_SCHEDULER, type RefreshScheduler } from "./auto-refresh"
 import type { ScheduledTaskState, ScheduledTaskStore } from "./scheduled-task-store"
 import {
   advanceScheduledTask,
@@ -42,7 +42,7 @@ export class ScheduledTaskService {
   readonly #store: ScheduledTaskStore
   readonly #sink: ScheduledTaskEventSink
   readonly #now: () => Date
-  readonly #timer: RefreshScheduler | undefined
+  readonly #timer: RefreshScheduler
   #state: ScheduledTaskState
   #diagnostic: string | null
   #handle: unknown
@@ -51,7 +51,7 @@ export class ScheduledTaskService {
     this.#store = options.store
     this.#sink = options.sink
     this.#now = options.now ?? (() => new Date())
-    this.#timer = options.timer
+    this.#timer = options.timer ?? DEFAULT_SCHEDULER
     const loaded = this.#store.load()
     this.#state = loaded.state
     this.#diagnostic = loaded.diagnostic
@@ -62,13 +62,13 @@ export class ScheduledTaskService {
   }
 
   start(): void {
-    if (this.#timer === undefined || this.running) return
+    if (this.running) return
     this.tick()
     this.#handle = this.#timer.setInterval(() => this.tick(), 60_000)
   }
 
   stop(): void {
-    if (this.#handle !== undefined) this.#timer?.clearInterval(this.#handle)
+    if (this.#handle !== undefined) this.#timer.clearInterval(this.#handle)
     this.#handle = undefined
   }
 

@@ -1,10 +1,16 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { stripVTControlCharacters } from "node:util"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
 import { AgentController, type AgentDriver, type AgentDriverEvent } from "../src/agent-controller"
 import { MarketIntelligenceApp } from "../src/app"
+import { AutomationRuntime } from "../src/automation-runtime"
+import { ConditionalOrderStore } from "../src/conditional-order-store"
 import type { MarketDataSource, MarketSnapshot } from "../src/market-data"
 import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news-data"
+import { ScheduledTaskStore } from "../src/scheduled-task-store"
 import { PaperTradingService } from "../src/trading"
 import { WatchlistService } from "../src/watchlist"
 
@@ -422,6 +428,13 @@ describe("Agent 命令窗口", () => {
       },
     }
     const watchlist = new WatchlistService({ codes: ["SH600519"] })
+    const directory = mkdtempSync(join(tmpdir(), "astocktui-command-window-watch-"))
+    const automation = new AutomationRuntime({
+      sink: { enqueue: () => "queued" },
+      lotSize: 100,
+      conditionalOrderStore: new ConditionalOrderStore(join(directory, "conditional-orders.json")),
+      scheduledTaskStore: new ScheduledTaskStore(join(directory, "scheduled-tasks.json")),
+    })
     const app = new MarketIntelligenceApp(
       source,
       undefined,
@@ -429,6 +442,10 @@ describe("Agent 命令窗口", () => {
       new PaperTradingService(),
       undefined,
       watchlist,
+      undefined,
+      undefined,
+      undefined,
+      automation,
     )
 
     await enterCommand(app, "/watch list")
@@ -448,6 +465,7 @@ describe("Agent 命令窗口", () => {
     expect(stripVTControlCharacters(app.render(79).join("\n"))).toContain("已删除 SZ000938")
     expect(watchlist.codes).toEqual(["SH600519"])
     expect(requestedCodes.at(-1)).toEqual(["SH600519"])
+    rmSync(directory, { recursive: true, force: true })
   })
 
   test("普通问题交给 Pi Agent 并显示真实流式回答和工具状态", async () => {

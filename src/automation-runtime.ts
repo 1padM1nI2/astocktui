@@ -5,6 +5,7 @@ import { ConditionalOrderService, type VolumeBaselineFetcher } from "./condition
 import { ConditionalOrderStore } from "./conditional-order-store"
 import { createScheduledTaskService } from "./scheduled-task-runtime"
 import type { ScheduledTaskService } from "./scheduled-task-service"
+import type { ScheduledTaskStore } from "./scheduled-task-store"
 import { shanghaiDateTime } from "./trading-calendar"
 
 export interface AutomationRuntimeOptions {
@@ -12,6 +13,8 @@ export interface AutomationRuntimeOptions {
   readonly timer?: RefreshScheduler | undefined
   readonly lotSize: number
   readonly volumeBaseline?: VolumeBaselineFetcher | undefined
+  readonly conditionalOrderStore?: ConditionalOrderStore | undefined
+  readonly scheduledTaskStore?: ScheduledTaskStore | undefined
 }
 
 async function defaultVolumeBaseline(code: string): Promise<number | null> {
@@ -37,9 +40,9 @@ export class AutomationRuntime {
     this.conditions = new ConditionalOrderService({
       sink: options.sink,
       lotSize: options.lotSize,
-      store: new ConditionalOrderStore(),
+      store: options.conditionalOrderStore ?? new ConditionalOrderStore(),
       volumeBaseline: options.volumeBaseline ?? defaultVolumeBaseline,
     })
-    this.tasks = createScheduledTaskService(options.sink, options.timer)
+    this.tasks = createScheduledTaskService(options.sink, options.timer, options.scheduledTaskStore)
   }
 }

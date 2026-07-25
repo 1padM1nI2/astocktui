@@ -71,6 +71,10 @@ export class ToolCallLogger {
     })
   }
 
+  recordEvent(kind: string, fields: Record<string, unknown>): void {
+    this.#append({ timestamp: this.#now().toISOString(), phase: "event", kind, ...fields })
+  }
+
   recordEnd(info: ToolCallEndInfo): void {
     const at = this.#now()
     const startedAt = this.#startedAt.get(info.id)

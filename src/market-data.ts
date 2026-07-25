@@ -30,7 +30,12 @@ export interface MarketQuote {
   readonly market?: StockMarket
   readonly currency?: string
   readonly marketState?: "open" | "closed" | "delayed" | "unknown"
+  readonly open?: number
+  readonly high?: number
+  readonly low?: number
+  readonly previousClose?: number
   readonly volume?: number
+  readonly trend?: readonly number[]
   readonly asOf?: number | null
 }
 
@@ -65,6 +70,11 @@ export interface StockApiQuote {
 
 export interface StockApiKline {
   readonly close: number
+  readonly date?: string
+  readonly open?: number
+  readonly high?: number
+  readonly low?: number
+  readonly volume?: number
 }
 
 export interface StockApiKlineOptions {
@@ -77,22 +87,30 @@ export interface StockApiClient {
   getKlines(code: string, options?: StockApiKlineOptions): Promise<readonly StockApiKline[]>
 }
 
+const KLINE_CACHE_TTL_MS = 5 * 60_000
+
 export class StockApiMarketDataSource implements MarketDataSource {
   readonly #client: StockApiClient
+  readonly #now: () => number
+  readonly #klineCache = new Map<
+    string,
+    { readonly at: number; readonly klines: readonly StockApiKline[] }
+  >()
 
-  constructor(client: StockApiClient = stocks.auto) {
+  constructor(client: StockApiClient = stocks.auto, now: () => number = Date.now) {
     this.#client = client
+    this.#now = now
   }
 
   async loadSnapshot(codes: readonly string[]): Promise<MarketSnapshot> {
     const focusCode = codes[0]
     if (focusCode === undefined) throw new Error("自选股为空")
 
-    const quoteRequest = this.#client.getStocks([...codes])
-    const trendRequest = this.#client
-      .getKlines(focusCode, { period: "day", count: 24 })
-      .catch((): readonly StockApiKline[] => [])
-    const [rawQuotes, rawKlines] = await Promise.all([quoteRequest, trendRequest])
+    const [rawQuotes, klines] = await Promise.all([
+      this.#client.getStocks([...codes]),
+      Promise.all(codes.map((code) => this.#loadKlines(code))),
+    ])
+    const klinesByCode = new Map(codes.map((code, index) => [code, klines[index] ?? []]))
 
     const quotes: MarketQuote[] = []
     let snapshotSource = ""
@@ -124,13 +142,31 @@ export class StockApiMarketDataSource implements MarketDataSource {
         continue
       }
 
+      const rows = klinesByCode.get(quote.code) ?? []
+      const quoteTrend = rows
+        .filter((kline) => Number.isFinite(kline.close) && kline.close > 0)
+        .map((kline) => kline.close)
+      const lastKline = rows.at(-1)
+      const open = lastKline?.open
+      const klineVolume = lastKline?.volume
+      const volume =
+        typeof quote.volume === "number" && quote.volume > 0
+          ? quote.volume
+          : typeof klineVolume === "number" && klineVolume > 0
+            ? klineVolume
+            : undefined
       quotes.push({
         code: quote.code,
         name: quote.name,
         price: quote.now,
         changePercent: Math.round(quote.percent * 1_000_000) / 10_000,
         source,
-        ...(typeof quote.volume === "number" && quote.volume > 0 ? { volume: quote.volume } : {}),
+        ...(typeof open === "number" && open > 0 ? { open } : {}),
+        ...(quote.high > 0 ? { high: quote.high } : {}),
+        ...(quote.low > 0 ? { low: quote.low } : {}),
+        ...(quote.yesterday > 0 ? { previousClose: quote.yesterday } : {}),
+        ...(volume === undefined ? {} : { volume }),
+        ...(quoteTrend.length > 0 ? { trend: quoteTrend } : {}),
       })
       if (snapshotSource.length === 0) snapshotSource = source
       else if (snapshotSource !== source) snapshotSource = "多源"
@@ -138,12 +174,20 @@ export class StockApiMarketDataSource implements MarketDataSource {
 
     if (quotes.length === 0) throw new Error("没有可用行情")
 
-    const trend: number[] = []
-    for (const kline of rawKlines) {
-      if (Number.isFinite(kline.close) && kline.close > 0) trend.push(kline.close)
-    }
+    const focusTrend = (klinesByCode.get(focusCode) ?? [])
+      .filter((kline) => Number.isFinite(kline.close) && kline.close > 0)
+      .map((kline) => kline.close)
+    return { quotes, trend: focusTrend, source: snapshotSource }
+  }
 
-    return { quotes, trend, source: snapshotSource }
+  async #loadKlines(code: string): Promise<readonly StockApiKline[]> {
+    const cached = this.#klineCache.get(code)
+    if (cached !== undefined && this.#now() - cached.at < KLINE_CACHE_TTL_MS) return cached.klines
+    const klines = await this.#client
+      .getKlines(code, { period: "day", count: 24 })
+      .catch((): readonly StockApiKline[] => [])
+    this.#klineCache.set(code, { at: this.#now(), klines })
+    return klines
   }
 }
 

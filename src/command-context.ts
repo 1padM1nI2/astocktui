@@ -1,3 +1,4 @@
+import type { AgentModelSwitcher } from "./agent-controller"
 import type { AgentEventSink } from "./agent-event-dispatcher"
 import type { CommandExecution } from "./commands"
 import type { ConditionalOrderService } from "./conditional-order-service"
@@ -50,6 +51,7 @@ export interface CommandContext {
   watchlist(): readonly string[]
   changeWatchlist(action: "add" | "remove", code: string): Promise<WatchlistChange>
   systemEvents?(): AgentEventSink
+  agentModel?(): AgentModelSwitcher | undefined
   conditionalOrders?(): ConditionalOrderService
   scheduledTasks?(): ScheduledTaskService
   memory?(): MemoryService
