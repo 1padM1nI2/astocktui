@@ -1,4 +1,5 @@
 import { matchesKey } from "@oh-my-pi/pi-tui"
+import { agentPanelHeight } from "./layout-tiers"
 
 export class AgentScrollState {
   #offset = 0
@@ -40,10 +41,7 @@ export class AgentScrollState {
 
   #pageSize(viewportRows: number): number {
     const safeRows = Math.max(1, viewportRows | 0)
-    const agentHeight =
-      this.#lastRenderWidth >= 160
-        ? Math.min(safeRows, Math.max(Math.ceil(safeRows / 2), Math.min(12, safeRows)))
-        : safeRows
+    const agentHeight = agentPanelHeight(this.#lastRenderWidth, safeRows)
     return Math.max(1, agentHeight - 5)
   }
 }

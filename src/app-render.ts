@@ -3,6 +3,7 @@ import type { AgentSessionView } from "./agent-controller"
 import type { CommandPromptView } from "./command-prompt"
 import type { WorkspaceName } from "./commands"
 import { AgentWorkspace } from "./components/agent"
+import { agentPanelHeight, layoutTier } from "./layout-tiers"
 import type { ScheduledTaskSummary } from "./scheduled-task-service"
 import { fitLine } from "./width"
 import { renderWorkspacePanel, zipColumns } from "./workspace-layout"
@@ -46,7 +47,9 @@ export function renderAppFrame(width: number, state: AppFrameState): readonly st
   const safeWidth = Math.max(0, width | 0)
   const viewportRows = Math.max(1, state.viewportRows | 0)
   const lines: string[] = []
-  if (safeWidth >= 160) renderWide(lines, safeWidth, viewportRows, state)
+  const tier = layoutTier(safeWidth)
+  if (tier === "wide") renderWide(lines, safeWidth, viewportRows, state)
+  else if (tier === "medium") renderMedium(lines, safeWidth, viewportRows, state)
   else lines.push(...renderActive(safeWidth, viewportRows, state))
   return lines.map((line) => fitLine(line, safeWidth))
 }
@@ -57,10 +60,7 @@ function renderWide(
   viewportRows: number,
   state: AppFrameState,
 ): void {
-  const agentHeight = Math.min(
-    viewportRows,
-    Math.max(Math.ceil(viewportRows / 2), Math.min(12, viewportRows)),
-  )
+  const agentHeight = agentPanelHeight(width, viewportRows)
   const topHeight = viewportRows - agentHeight
   const available = width - 2
   const marketWidth = Math.floor(available * 0.34)
@@ -113,6 +113,64 @@ function renderWide(
     },
   ]
   lines.push(...zipColumns(bottomColumns, width, " ", agentHeight))
+}
+
+function renderMedium(
+  lines: string[],
+  width: number,
+  viewportRows: number,
+  state: AppFrameState,
+): void {
+  const agentHeight = agentPanelHeight(width, viewportRows)
+  const panelsRows = viewportRows - agentHeight
+  const topHeight = Math.ceil(panelsRows / 2)
+  const midHeight = panelsRows - topHeight
+  const available = width - 1
+  const leftWidth = Math.floor(available * 0.55)
+  const rightWidth = available - leftWidth
+  const topColumns = [
+    {
+      lines: renderWorkspacePanel(state.market, leftWidth, topHeight, state.activeTab === MARKET),
+      width: leftWidth,
+    },
+    {
+      lines: renderWorkspacePanel(
+        state.portfolio,
+        rightWidth,
+        topHeight,
+        state.activeTab === PORTFOLIO,
+      ),
+      width: rightWidth,
+    },
+  ]
+  lines.push(...zipColumns(topColumns, width, " ", topHeight))
+  const midColumns = [
+    {
+      lines: renderWorkspacePanel(state.news, leftWidth, midHeight, state.activeTab === NEWS),
+      width: leftWidth,
+    },
+    {
+      lines: renderWorkspacePanel(
+        state.tradeHistory,
+        rightWidth,
+        midHeight,
+        state.activeTab === TRADE,
+      ),
+      width: rightWidth,
+    },
+  ]
+  lines.push(...zipColumns(midColumns, width, " ", midHeight))
+  lines.push(
+    ...new AgentWorkspace(
+      state.prompt.input,
+      state.activeTab === AGENT,
+      state.prompt,
+      state.agent,
+      state.agentScrollOffset,
+      state.memoryCount,
+      state.scheduledTasks,
+    ).renderAtHeight(width, agentHeight),
+  )
 }
 
 function renderActive(width: number, height: number, state: AppFrameState): readonly string[] {

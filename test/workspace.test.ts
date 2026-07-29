@@ -97,7 +97,7 @@ describe("市场智能工作台", () => {
     app.handleInput("\t")
     app.handleInput("\t")
     app.handleInput("\t")
-    const narrowFrame = stripVTControlCharacters(app.render(159).join("\n"))
+    const narrowFrame = stripVTControlCharacters(app.render(109).join("\n"))
     expect(narrowFrame).toContain("Agent / 上下文")
     expect(narrowFrame).not.toContain("交易记录 / 最近成交")
   })
@@ -166,13 +166,62 @@ describe("市场智能工作台", () => {
     expect(narrowTitle).not.toContain("实时新闻")
   })
 
-  test("159 列终端只显示当前工作区", () => {
-    const frame = new MarketIntelligenceApp().render(159).join("\n")
+  test("109 列终端只显示当前工作区", () => {
+    const frame = new MarketIntelligenceApp().render(109).join("\n")
 
     expect(frame).toContain("行情 / 沪深A股 实时")
     expect(frame).not.toContain("实时新闻 / 财经")
     expect(frame).not.toContain("持仓 / 模拟账户")
     expect(frame).not.toContain("Agent / 上下文")
+  })
+
+  test("中等宽度（110~159 列）同时显示全部五个工作区", () => {
+    const app = new MarketIntelligenceApp(undefined, undefined, () => 30)
+    const frame = app.render(120)
+    const text = frame.join("\n")
+
+    expect(frame).toHaveLength(30)
+    expect(text).toContain("行情 / 沪深A股 实时")
+    expect(text).toContain("持仓 / 模拟账户")
+    expect(text).toContain("实时新闻 / 财经")
+    expect(text).toContain("Agent / 上下文")
+    expect(text).toContain("交易记录 / 最近成交")
+    expectFrameFits(frame, 120)
+    expectFrameFits(app.render(110), 110)
+    expectFrameFits(app.render(159), 159)
+  })
+
+  test("中等宽度布局上排行情与持仓，中排新闻与交易，Agent 垫底全宽", () => {
+    const app = new MarketIntelligenceApp(undefined, undefined, () => 30)
+    const frame = app.render(120)
+
+    const topHeader = frame.find((line) => line.includes("行情 / 沪深A股 实时")) ?? ""
+    expect(topHeader).toContain("持仓 / 模拟账户")
+    expect(topHeader).not.toContain("实时新闻 / 财经")
+    expect(topHeader.match(/╭/g)).toHaveLength(2)
+
+    const midHeader = frame.find((line) => line.includes("实时新闻 / 财经")) ?? ""
+    expect(midHeader).toContain("交易记录 / 最近成交")
+    expect(midHeader.match(/╭/g)).toHaveLength(2)
+
+    const agentIndex = frame.findIndex((line) => line.includes("Agent / 上下文"))
+    const newsIndex = frame.findIndex((line) => line.includes("实时新闻 / 财经"))
+    expect(agentIndex).toBeGreaterThan(newsIndex)
+    expect(visibleWidth(frame[agentIndex] ?? "")).toBe(120)
+    expect(frame.at(-1)).toContain("╰")
+    expect(frame.at(-1)).toContain("╯")
+  })
+
+  test("中等宽度下切换工作区高亮对应边框", () => {
+    const app = new MarketIntelligenceApp(undefined, undefined, () => 30)
+    const frame = app.render(120)
+    expect(frame.find((line) => line.includes("行情")) ?? "").toContain("◆ 行情 / 沪深A股 实时")
+
+    app.handleInput("\t")
+    const portfolioFrame = app.render(120)
+    expect(portfolioFrame.find((line) => line.includes("持仓")) ?? "").toContain(
+      "◆ 持仓 / 模拟账户",
+    )
   })
 
   test("在 79 列终端中以单工作区显示且中文文本不溢出", () => {

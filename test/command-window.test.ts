@@ -260,7 +260,7 @@ describe("Agent 命令窗口", () => {
     focusAgent(app)
 
     enter(app, "/status")
-    const frame = app.render(120).join("\n")
+    const frame = app.render(79).join("\n")
     expect(frame).toContain("工作台状态")
     expect(frame).toContain("工作区 Agent")
     expect(frame).toContain("行情 未加载")
@@ -281,19 +281,19 @@ describe("Agent 命令窗口", () => {
     focusAgent(app)
 
     await enterCommand(app, "/buy 519 100")
-    let frame = stripVTControlCharacters(app.render(120).join("\n"))
+    let frame = stripVTControlCharacters(app.render(79).join("\n"))
     expect(frame).toContain("股票代码格式无效")
     expect(trading.snapshot.positions).toEqual([])
 
     await enterCommand(app, "/preview buy 600519 100")
-    frame = stripVTControlCharacters(app.render(120).join("\n"))
+    frame = stripVTControlCharacters(app.render(79).join("\n"))
     expect(frame).toContain("交易预览")
     expect(frame).toContain("买入 SH600519 贵州茅台 100股")
     expect(frame).toContain("预计支出 ¥10,005.10")
     expect(trading.snapshot.positions).toEqual([])
 
     await enterCommand(app, "/buy 600519 100")
-    frame = stripVTControlCharacters(app.render(120).join("\n"))
+    frame = stripVTControlCharacters(app.render(79).join("\n"))
     expect(frame).toContain("模拟买入成交")
     expect(frame).toContain("成交金额 ¥10,000.00")
     expect(trading.snapshot.positions[0]?.quantity).toBe(100)
@@ -302,7 +302,7 @@ describe("Agent 命令窗口", () => {
     expect(wideFrame).toContain("SIM-0001 买入 SH600519 100股")
 
     enter(app, "/portfolio")
-    frame = stripVTControlCharacters(app.render(120).join("\n"))
+    frame = stripVTControlCharacters(app.render(79).join("\n"))
     expect(frame).toContain("SH600519 贵州茅台 100股")
     expect(frame).toContain("¥89,994.90")
 
@@ -335,12 +335,12 @@ describe("Agent 命令窗口", () => {
     focusAgent(app)
 
     enter(app, "/buy 000938 100")
-    expect(app.render(120).join("\n")).toContain("命令执行中")
-    expect(stripVTControlCharacters(app.render(120).join("\n"))).toContain("● 执行中")
+    expect(app.render(79).join("\n")).toContain("命令执行中")
+    expect(stripVTControlCharacters(app.render(79).join("\n"))).toContain("● 执行中")
     await app.waitForCommand()
 
     expect(requestedCodes).toContain("SZ000938")
-    expect(app.render(120).join("\n")).toContain("模拟买入成交")
+    expect(app.render(79).join("\n")).toContain("模拟买入成交")
     expect(trading.snapshot.positions[0]?.code).toBe("SZ000938")
   })
 
@@ -359,22 +359,22 @@ describe("Agent 命令窗口", () => {
     await enterCommand(app, "/buy 600519 100")
 
     await enterCommand(app, "/sell 600519 all")
-    expect(app.render(120).join("\n")).toContain("T+1")
+    expect(app.render(79).join("\n")).toContain("T+1")
 
     now = new Date("2026-07-16T02:00:00.000Z")
     await enterCommand(app, "/sell 600519 all")
-    expect(app.render(120).join("\n")).toContain("模拟卖出成交")
+    expect(app.render(79).join("\n")).toContain("模拟卖出成交")
 
     enter(app, "/trades 600519")
-    const trades = stripVTControlCharacters(app.render(120).join("\n"))
+    const trades = stripVTControlCharacters(app.render(79).join("\n"))
     expect(trades).toContain("成交记录")
     expect(trades).toContain("买入 SH600519")
     expect(trades).toContain("卖出 SH600519")
 
     enter(app, "/account reset")
-    expect(app.render(120).join("\n")).toContain("需要确认")
+    expect(app.render(79).join("\n")).toContain("需要确认")
     enter(app, "/account reset confirm")
-    expect(app.render(120).join("\n")).toContain("模拟账户已重置")
+    expect(app.render(79).join("\n")).toContain("模拟账户已重置")
     expect(trading.trades).toEqual([])
   })
 
