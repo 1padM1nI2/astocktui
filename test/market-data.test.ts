@@ -81,20 +81,25 @@ describe("stock-api 行情适配", () => {
       },
     }
 
-    const snapshot = await new StockApiMarketDataSource(client, Date.now, async (codes) => {
-      const details = new Map()
-      if (codes.includes("SH600519"))
-        details.set("SH600519", {
-          code: "SH600519",
-          turnover: 462_224,
-          turnoverRate: 0.29,
-          peTtm: 19.61,
-          totalMarketCap: 16_218.68,
-          limitUp: 1421.21,
-          limitDown: 1162.81,
-        })
-      return details
-    }).loadSnapshot(["SH600519", "SZ000858"])
+    const snapshot = await new StockApiMarketDataSource(
+      client,
+      Date.now,
+      async (codes) => {
+        const details = new Map()
+        if (codes.includes("SH600519"))
+          details.set("SH600519", {
+            code: "SH600519",
+            turnover: 462_224,
+            turnoverRate: 0.29,
+            peTtm: 19.61,
+            totalMarketCap: 16_218.68,
+            limitUp: 1421.21,
+            limitDown: 1162.81,
+          })
+        return details
+      },
+      async () => new Map(),
+    ).loadSnapshot(["SH600519", "SZ000858"])
 
     expect(requestedCodes).toEqual(["SH600519", "SZ000858"])
     expect(klineCalls.sort()).toEqual(["SH600519:day:60", "SZ000858:day:60"])
@@ -157,6 +162,65 @@ describe("stock-api 行情适配", () => {
     })
   })
 
+  test("分时数据存在时走势使用当天分钟价格", async () => {
+    const source = new StockApiMarketDataSource(
+      clientWith(
+        [
+          {
+            code: "SH600519",
+            name: "贵州茅台",
+            now: 1499,
+            percent: 0.0189,
+            low: 1490,
+            high: 1499,
+            yesterday: 1471.08,
+            source: "tencent",
+          },
+        ],
+        [{ date: "2026-07-24", open: 1470, close: 1471.08, high: 1475, low: 1465 }],
+      ),
+      Date.now,
+      async () => new Map(),
+      async () => new Map([["SH600519", [1492, 1490.5, 1495.8, 1499]]]),
+    )
+
+    const snapshot = await source.loadSnapshot(["SH600519"])
+
+    expect(snapshot.quotes[0]?.trend).toEqual([1492, 1490.5, 1495.8, 1499])
+    expect(snapshot.trend).toEqual([1492, 1490.5, 1495.8, 1499])
+  })
+
+  test("分时数据缺失时回退到日 K 收盘价", async () => {
+    const source = new StockApiMarketDataSource(
+      clientWith(
+        [
+          {
+            code: "SH600519",
+            name: "贵州茅台",
+            now: 1488.88,
+            percent: 0.0121,
+            low: 1460,
+            high: 1499,
+            yesterday: 1471.08,
+            source: "tencent",
+          },
+        ],
+        [
+          { date: "2026-07-21", open: 1465, close: 1470, high: 1475, low: 1460 },
+          { date: "2026-07-22", open: 1480, close: 1488.88, high: 1499, low: 1460 },
+        ],
+      ),
+      Date.now,
+      async () => new Map(),
+      async () => new Map(),
+    )
+
+    const snapshot = await source.loadSnapshot(["SH600519"])
+
+    expect(snapshot.quotes[0]?.trend).toEqual([1470, 1488.88])
+    expect(snapshot.trend).toEqual([1470, 1488.88])
+  })
+
   test("K 线缓存有效期内不重复请求", async () => {
     let calls = 0
     let tick = 0
@@ -183,6 +247,7 @@ describe("stock-api 行情适配", () => {
     const source = new StockApiMarketDataSource(
       client,
       () => tick * 60_000,
+      async () => new Map(),
       async () => new Map(),
     )
 
@@ -215,6 +280,7 @@ describe("stock-api 行情适配", () => {
       ),
       Date.now,
       async () => new Map(),
+      async () => new Map(),
     )
 
     const snapshot = await source.loadSnapshot(["SH600519"])
@@ -225,7 +291,12 @@ describe("stock-api 行情适配", () => {
   })
 
   test("拒绝上游空结果和 base 占位数据", async () => {
-    const empty = new StockApiMarketDataSource(clientWith([]), Date.now, async () => new Map())
+    const empty = new StockApiMarketDataSource(
+      clientWith([]),
+      Date.now,
+      async () => new Map(),
+      async () => new Map(),
+    )
     const placeholder = new StockApiMarketDataSource(
       clientWith([
         {
@@ -240,6 +311,7 @@ describe("stock-api 行情适配", () => {
         },
       ]),
       Date.now,
+      async () => new Map(),
       async () => new Map(),
     )
 
@@ -263,6 +335,7 @@ describe("stock-api 行情适配", () => {
       ]),
       Date.now,
       async () => new Map(),
+      async () => new Map(),
     )
     const unsafeSource = new StockApiMarketDataSource(
       clientWith([
@@ -278,6 +351,7 @@ describe("stock-api 行情适配", () => {
         },
       ]),
       Date.now,
+      async () => new Map(),
       async () => new Map(),
     )
 

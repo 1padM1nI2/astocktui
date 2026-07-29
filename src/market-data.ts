@@ -1,5 +1,6 @@
 import { stocks } from "stock-api"
 import { YahooGlobalMarketDataSource } from "./global-market-data"
+import { fetchTencentIntradayTrends, type IntradayTrendFetcher } from "./intraday-trend"
 import { isAshareCode, normalizeMarketCode, parseMarketCode, type StockMarket } from "./market-code"
 import { fetchTencentStockDetails, type StockDetail, type StockDetailFetcher } from "./stock-detail"
 
@@ -118,6 +119,7 @@ export class StockApiMarketDataSource implements MarketDataSource {
   readonly #client: StockApiClient
   readonly #now: () => number
   readonly #detailFetcher: StockDetailFetcher | undefined
+  readonly #intradayFetcher: IntradayTrendFetcher | undefined
   readonly #klineCache = new Map<
     string,
     { readonly at: number; readonly klines: readonly StockApiKline[] }
@@ -127,21 +129,26 @@ export class StockApiMarketDataSource implements MarketDataSource {
     client: StockApiClient = stocks.auto,
     now: () => number = Date.now,
     detailFetcher: StockDetailFetcher | undefined = fetchTencentStockDetails,
+    intradayFetcher: IntradayTrendFetcher | undefined = fetchTencentIntradayTrends,
   ) {
     this.#client = client
     this.#now = now
     this.#detailFetcher = detailFetcher
+    this.#intradayFetcher = intradayFetcher
   }
 
   async loadSnapshot(codes: readonly string[]): Promise<MarketSnapshot> {
     const focusCode = codes[0]
     if (focusCode === undefined) throw new Error("自选股为空")
 
-    const [rawQuotes, klines, details] = await Promise.all([
+    const [rawQuotes, klines, details, intradayTrends] = await Promise.all([
       this.#client.getStocks([...codes]),
       Promise.all(codes.map((code) => this.#loadKlines(code))),
       this.#detailFetcher?.(codes).catch((): ReadonlyMap<string, StockDetail> => new Map()) ??
         Promise.resolve(new Map<string, StockDetail>()),
+      this.#intradayFetcher?.(codes).catch(
+        (): ReadonlyMap<string, readonly number[]> => new Map(),
+      ) ?? Promise.resolve(new Map<string, readonly number[]>()),
     ])
     const klinesByCode = new Map(codes.map((code, index) => [code, klines[index] ?? []]))
 
@@ -176,9 +183,14 @@ export class StockApiMarketDataSource implements MarketDataSource {
       }
 
       const rows = klinesByCode.get(quote.code) ?? []
-      const quoteTrend = rows
-        .filter((kline) => Number.isFinite(kline.close) && kline.close > 0)
-        .map((kline) => kline.close)
+      // 优先用当天分时价格，缺失时回退到日 K 收盘价
+      const intradayTrend = intradayTrends.get(quote.code) ?? []
+      const quoteTrend =
+        intradayTrend.length > 0
+          ? intradayTrend
+          : rows
+              .filter((kline) => Number.isFinite(kline.close) && kline.close > 0)
+              .map((kline) => kline.close)
       const lastKline = rows.at(-1)
       const open = lastKline?.open ?? details.get(quote.code)?.open
       const klineVolume = lastKline?.volume
@@ -209,9 +221,13 @@ export class StockApiMarketDataSource implements MarketDataSource {
 
     if (quotes.length === 0) throw new Error("没有可用行情")
 
-    const focusTrend = (klinesByCode.get(focusCode) ?? [])
-      .filter((kline) => Number.isFinite(kline.close) && kline.close > 0)
-      .map((kline) => kline.close)
+    const focusIntraday = intradayTrends.get(focusCode) ?? []
+    const focusTrend =
+      focusIntraday.length > 0
+        ? focusIntraday
+        : (klinesByCode.get(focusCode) ?? [])
+            .filter((kline) => Number.isFinite(kline.close) && kline.close > 0)
+            .map((kline) => kline.close)
     return {
       quotes,
       trend: focusTrend,
