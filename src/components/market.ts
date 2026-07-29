@@ -170,7 +170,7 @@ export class MarketWorkspace implements Component {
               quote.name,
               quote.price.toFixed(2),
               change,
-              renderMiniSparkline(quote.trend),
+              renderMiniSparkline(quote.trend, quote.changePercent),
               stateLabel(quote),
             ],
             safeWidth,

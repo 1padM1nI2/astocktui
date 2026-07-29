@@ -16,10 +16,12 @@ function sparklineBlocks(prices: readonly number[], slots: number): string {
   const min = Math.min(...prices)
   const max = Math.max(...prices)
   const range = max - min
-  const step = Math.max(1, Math.ceil(prices.length / slots))
+  // 等距取样且始终包含首尾点，确保最新收盘价出现在末端
+  const barCount = Math.max(2, Math.min(slots, prices.length))
   let spark = ""
-  for (let i = 0; i < prices.length; i += step) {
-    const price = prices[i] ?? min
+  for (let bar = 0; bar < barCount; bar++) {
+    const index = Math.round((bar * (prices.length - 1)) / (barCount - 1))
+    const price = prices[index] ?? min
     const level = range === 0 ? 3 : Math.round(((price - min) / range) * 7)
     spark += SPARK_LEVELS[level]
   }
@@ -39,10 +41,14 @@ export function renderSparkline(prices: readonly number[], width: number): strin
   return fitLine(`走势 ${min.toFixed(2)} ${color}${spark}${reset} ${max.toFixed(2)}`, width)
 }
 
-export function renderMiniSparkline(prices: readonly number[] | undefined): string {
+export function renderMiniSparkline(
+  prices: readonly number[] | undefined,
+  changePercent?: number,
+): string {
   if (prices === undefined || prices.length < 2) return "--"
   const spark = sparklineBlocks(prices, MINI_SPARK_WIDTH)
-  const change = (prices[prices.length - 1] ?? 0) - (prices[0] ?? 0)
+  // 优先按当日涨跌幅着色，避免长期趋势掩盖当日方向
+  const change = changePercent ?? (prices[prices.length - 1] ?? 0) - (prices[0] ?? 0)
   const color = trendColor(change)
   const reset = color.length > 0 ? ANSI.reset : ""
   return `${color}${spark}${reset}`

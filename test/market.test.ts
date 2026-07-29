@@ -135,6 +135,33 @@ test("宽屏个股行内显示迷你走势，无走势数据时占位", () => {
   expect(stripVTControlCharacters(wuliang)).toContain("--")
 })
 
+test("迷你走势按当日涨跌幅着色，且末端反映最新收盘价", () => {
+  const market = new MarketWorkspace(["SH600519"])
+  market.applySnapshot({
+    source: "tencent",
+    trend: [],
+    quotes: [
+      {
+        code: "SH600519",
+        name: "贵州茅台",
+        price: 90,
+        changePercent: -9.99,
+        source: "tencent",
+        // 60 日趋势整体走高，但最新一个交易日暴跌
+        trend: [...Array.from({ length: 59 }, () => 100), 90],
+      },
+    ],
+  })
+
+  const row = market.render(80).find((line) => line.includes("SH600519")) ?? ""
+  // 当日 -9.99%，行内不能出现红色
+  expect(row).not.toContain(ANSI.red)
+  const spark = stripVTControlCharacters(row).match(/[▁▂▃▄▅▆▇█]+/)?.[0] ?? ""
+  expect(spark.length).toBeGreaterThan(0)
+  // 最新收盘价（最低点）必须出现在走势末端
+  expect(spark.endsWith("▁")).toBe(true)
+})
+
 test("走势火花线用方块高度呈现曲线形状，按整体涨跌着色", () => {
   const quote = {
     code: "SH600519",
