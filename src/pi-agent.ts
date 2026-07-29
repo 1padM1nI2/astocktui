@@ -1,4 +1,4 @@
-import { Agent, type AgentMessage } from "@oh-my-pi/pi-agent-core"
+import { Agent, type AgentMessage, generateSummary } from "@oh-my-pi/pi-agent-core"
 import { getEnvApiKey, getEnvApiKeyName } from "@oh-my-pi/pi-ai"
 import { AgentController, type AgentDriver } from "./agent-controller"
 import type { AgentExtensionRuntime } from "./agent-extensions"
@@ -17,6 +17,9 @@ export interface PiAgentConfig {
   readonly baseUrl?: string
   readonly fallbackModels?: readonly string[]
 }
+
+/** 上下文压缩摘要的长度预算（generateSummary 按 80% 折算输出上限） */
+const CONTEXT_SUMMARY_RESERVE_TOKENS = 2048
 
 class UnavailableAgentDriver implements AgentDriver {
   async run(): Promise<void> {}
@@ -96,7 +99,7 @@ export function createPiAgentController(
       })
     }
   })
-  const driver = new PiAgentDriver(
+  const driver: PiAgentDriver = new PiAgentDriver(
     agent,
     resolved.chain,
     new Map(tools.map((tool) => [tool.name, tool.label])),
@@ -104,6 +107,13 @@ export function createPiAgentController(
     sessionStore,
     undefined,
     (kind, fields) => toolCallLog.recordEvent(kind, fields),
+    async (messages) => {
+      const model = driver.activeModel
+      if (model === undefined || apiKey === undefined) {
+        throw new Error("模型或 API Key 未配置，无法压缩上下文")
+      }
+      return generateSummary([...messages], model, CONTEXT_SUMMARY_RESERVE_TOKENS, apiKey)
+    },
   )
   const restoredHistory = messagesToExchanges(restoredMessages as AgentMessage[], (name) =>
     driver.toolLabel(name),

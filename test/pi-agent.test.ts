@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import {
+  isContextOverflowError,
   isQuotaExhaustedError,
   parseFallbackModelList,
   withAgentBaseUrl,
@@ -64,6 +65,20 @@ test("识别额度耗尽错误，排除鉴权与瞬时限流", () => {
   expect(isQuotaExhaustedError("400 请求超过最大上下文长度")).toBe(false)
 })
 
+test("识别上下文超限错误，排除额度与鉴权错误", () => {
+  expect(isContextOverflowError("400 invalid params, context window exceeds limit (2013)")).toBe(
+    true,
+  )
+  expect(isContextOverflowError("This model's maximum context length is 8192 tokens")).toBe(true)
+  expect(isContextOverflowError("400 请求超过最大上下文长度")).toBe(true)
+  expect(isContextOverflowError("too many tokens in request")).toBe(true)
+  expect(isContextOverflowError("429 insufficient_quota: You exceeded your current quota")).toBe(
+    false,
+  )
+  expect(isContextOverflowError("401 invalid_api_key")).toBe(false)
+  expect(isContextOverflowError("500 internal server error")).toBe(false)
+})
+
 interface StubMessage {
   readonly role: string
   readonly stopReason?: string
@@ -75,8 +90,10 @@ class StubAgent {
   model: unknown
   continued = 0
   readonly failWith: string | null
-  constructor(failWith: string | null) {
+  lengthStops: number
+  constructor(failWith: string | null, lengthStops = 0) {
     this.failWith = failWith
+    this.lengthStops = lengthStops
   }
   subscribe(): void {}
   setSystemPrompt(): void {}
@@ -100,6 +117,11 @@ class StubAgent {
         stopReason: "error",
         errorMessage: this.failWith,
       })
+      return
+    }
+    if (this.lengthStops > 0) {
+      this.lengthStops--
+      this.state.messages.push({ role: "assistant", stopReason: "length" })
       return
     }
     this.state.messages.push({ role: "assistant", stopReason: "stop" })
@@ -189,6 +211,172 @@ test("备用模型全部额度耗尽时抛出最后一个错误", async () => {
   )
   await expect(driver.run("分析一下", () => {})).rejects.toThrow("402 insufficient balance")
   expect(agent.continued).toBe(1)
+})
+
+test("上下文超限时清空历史重试并提示", async () => {
+  const agent = new StubAgent("400 invalid params, context window exceeds limit (2013)")
+  agent.state.messages.push(
+    { role: "user" },
+    { role: "assistant", stopReason: "stop" },
+    { role: "user" },
+    { role: "assistant", stopReason: "stop" },
+  )
+  const events: { readonly type: string; readonly name?: string; readonly summary?: string }[] = []
+  const debug: string[] = []
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+    undefined,
+    undefined,
+    (kind) => debug.push(kind),
+  )
+
+  await driver.run("分析一下", (event) => events.push(event))
+
+  expect(agent.continued).toBe(1)
+  // 仅保留最新一条用户消息，重试后得到正常回复
+  expect(agent.state.messages.map((message) => message.role)).toEqual(["user", "assistant"])
+  expect(agent.state.messages[1]?.stopReason).toBe("stop")
+  expect(
+    events.some(
+      (event) =>
+        event.type === "tool_end" &&
+        event.name === "context_trim" &&
+        event.summary?.includes("上下文") === true,
+    ),
+  ).toBe(true)
+  expect(debug).toContain("agent_context_trim")
+})
+
+test("上下文超限时优先压缩为摘要再重试", async () => {
+  const agent = new StubAgent("400 invalid params, context window exceeds limit (2013)")
+  agent.state.messages.push(
+    { role: "user" },
+    { role: "assistant", stopReason: "stop" },
+    { role: "user" },
+    { role: "assistant", stopReason: "stop" },
+  )
+  const summarized: string[][] = []
+  const events: { readonly type: string; readonly name?: string; readonly summary?: string }[] = []
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+    undefined,
+    undefined,
+    undefined,
+    async (messages) => {
+      summarized.push(messages.map((message) => message.role))
+      return "早前讨论了贵州茅台与五粮液的行情走势"
+    },
+  )
+
+  await driver.run("分析一下", (event) => events.push(event))
+
+  // 摘要请求覆盖全部历史消息
+  expect(summarized).toEqual([["user", "assistant", "user", "assistant"]])
+  // 历史被替换为「摘要消息 + 当前提问 + 新回复」
+  const roles = agent.state.messages.map((message) => message.role)
+  expect(roles).toEqual(["user", "user", "assistant"])
+  const summaryMessage = agent.state.messages[0] as {
+    readonly content?: readonly { readonly text?: string }[]
+  }
+  expect(summaryMessage.content?.[0]?.text).toContain("早前讨论了贵州茅台与五粮液的行情走势")
+  expect(agent.state.messages[2]?.stopReason).toBe("stop")
+  expect(
+    events.some(
+      (event) =>
+        event.type === "tool_end" &&
+        event.name === "context_trim" &&
+        event.summary?.includes("压缩") === true,
+    ),
+  ).toBe(true)
+})
+
+test("摘要生成失败时回退为清空历史重试", async () => {
+  const agent = new StubAgent("400 invalid params, context window exceeds limit (2013)")
+  agent.state.messages.push({ role: "user" }, { role: "assistant", stopReason: "stop" })
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+    undefined,
+    undefined,
+    undefined,
+    async () => {
+      throw new Error("摘要接口不可用")
+    },
+  )
+
+  await driver.run("分析一下", () => {})
+
+  expect(agent.continued).toBe(1)
+  expect(agent.state.messages.map((message) => message.role)).toEqual(["user", "assistant"])
+  expect(agent.state.messages[1]?.stopReason).toBe("stop")
+})
+
+test("清空历史重试后仍超限则抛出错误", async () => {
+  class AlwaysOverflowAgent extends StubAgent {
+    override async continue(): Promise<void> {
+      this.continued++
+      this.state.messages.push({
+        role: "assistant",
+        stopReason: "error",
+        errorMessage: "400 invalid params, context window exceeds limit (2013)",
+      })
+    }
+  }
+  const agent = new AlwaysOverflowAgent("400 invalid params, context window exceeds limit (2013)")
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+  )
+
+  await expect(driver.run("分析一下", () => {})).rejects.toThrow("context window exceeds limit")
+  expect(agent.continued).toBe(1)
+})
+
+test("输出被 max tokens 截断时自动续写至完成", async () => {
+  const agent = new StubAgent(null, 2)
+  const debug: string[] = []
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+    undefined,
+    undefined,
+    (kind) => debug.push(kind),
+  )
+
+  await driver.run("分析一下", () => {})
+
+  expect(agent.continued).toBe(2)
+  const stops = agent.state.messages
+    .filter((message) => message.role === "assistant")
+    .map((message) => message.stopReason)
+  expect(stops).toEqual(["length", "length", "stop"])
+  expect(debug).toContain("agent_length_continue")
+})
+
+test("截断续写达到上限后收尾，避免无限生成", async () => {
+  const agent = new StubAgent(null, 99)
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+  )
+
+  await driver.run("分析一下", () => {})
+
+  expect(agent.continued).toBe(3)
 })
 
 test("装配扩展工具时按名去重并记录调试事件", () => {

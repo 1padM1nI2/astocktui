@@ -36,6 +36,13 @@ export function isQuotaExhaustedError(message: string): boolean {
   return isUsageLimit(message) || QUOTA_EXHAUSTED_PATTERN.test(message)
 }
 
+const CONTEXT_OVERFLOW_PATTERN =
+  /context\s*(window|length|size)\s*(exceeds?|is\s*exceeded|overflow|too\s*long|limit)|maximum\s*context|too\s*many\s*tokens|上下文.*(超限|超出|过长)|超[出过].*上下文/iu
+
+export function isContextOverflowError(message: string): boolean {
+  return CONTEXT_OVERFLOW_PATTERN.test(message)
+}
+
 export function withAgentBaseUrl<TModel extends { readonly baseUrl: string }>(
   model: TModel,
   baseUrl: string | undefined,

@@ -1,4 +1,10 @@
 import type { Agent, AgentEvent, AgentTool } from "@oh-my-pi/pi-agent-core"
+import {
+  appendedAssistantOutcomes,
+  type ConversationSummarizer,
+  exclusivelyFailed,
+  recoverInterruptedTurn,
+} from "./agent-context-recovery"
 import type { AgentDriver, AgentDriverEvent } from "./agent-controller"
 import type { AgentExtensionRuntime } from "./agent-extensions"
 import {
@@ -33,6 +39,7 @@ export class PiAgentDriver implements AgentDriver {
   readonly #sessionStore: AgentSessionStore | undefined
   readonly #onModelChange: (() => void) | undefined
   readonly #onDebug: ((kind: string, fields: Record<string, unknown>) => void) | undefined
+  readonly #contextSummarizer: ConversationSummarizer | undefined
   #extensionSupplement: readonly string[] = []
   #modelIndex = 0
   #emit: ((event: AgentDriverEvent) => void) | null = null
@@ -46,6 +53,7 @@ export class PiAgentDriver implements AgentDriver {
     sessionStore?: AgentSessionStore,
     onModelChange?: () => void,
     onDebug?: (kind: string, fields: Record<string, unknown>) => void,
+    contextSummarizer?: ConversationSummarizer,
   ) {
     this.#agent = agent
     this.#models = models
@@ -53,6 +61,7 @@ export class PiAgentDriver implements AgentDriver {
     this.#sessionStore = sessionStore
     this.#onModelChange = onModelChange
     this.#onDebug = onDebug
+    this.#contextSummarizer = contextSummarizer
     for (const [name, label] of labels) this.#labels.set(name, label)
     this.#agent.subscribe((event) => this.#handleEvent(event))
     this.#agent.beforeToolCall = ({ toolCall }) =>
@@ -64,6 +73,11 @@ export class PiAgentDriver implements AgentDriver {
 
   get modelLabel(): string {
     return this.#models[this.#modelIndex]?.label ?? ""
+  }
+
+  /** 当前生效的模型对象，供上下文压缩等旁路调用使用 */
+  get activeModel(): AgentModelOption["model"] | undefined {
+    return this.#models[this.#modelIndex]?.model
   }
 
   modelLabels(): readonly string[] {
@@ -128,12 +142,20 @@ export class PiAgentDriver implements AgentDriver {
     this.#currentInput = input
     this.#agent.setSystemPrompt(this.#composePrompt())
     try {
-      const base = this.#agent.state.messages.length
+      let base = this.#agent.state.messages.length
       this.#onDebug?.("agent_prompt", { model: this.modelLabel, input: input.slice(0, 200) })
       await this.#agent.prompt(input)
       while (this.#advanceAfterQuotaFailure(base)) {
         await this.#agent.continue()
       }
+      base = await recoverInterruptedTurn({
+        agent: this.#agent,
+        base,
+        summarizer: this.#contextSummarizer,
+        emit: this.#emit,
+        advanceAfterQuotaFailure: (attemptBase) => this.#advanceAfterQuotaFailure(attemptBase),
+        onDebug: this.#onDebug,
+      })
       const fatal = this.#fatalError(base)
       if (fatal !== null) {
         this.#onDebug?.("agent_error", { model: this.modelLabel, error: fatal.message })
@@ -148,18 +170,8 @@ export class PiAgentDriver implements AgentDriver {
   }
 
   #advanceAfterQuotaFailure(base: number): boolean {
-    const appended = this.#agent.state.messages.slice(base)
-    const assistants = appended.filter((message) => message.role === "assistant") as {
-      readonly stopReason?: string
-      readonly errorMessage?: string
-    }[]
-    if (assistants.length === 0) return false
-    if (
-      assistants.some(
-        (message) => message.stopReason !== "error" && message.stopReason !== "aborted",
-      )
-    )
-      return false
+    const assistants = appendedAssistantOutcomes(this.#agent.state.messages, base)
+    if (!exclusivelyFailed(assistants)) return false
     const exhausted = assistants.some(
       (message) =>
         message.stopReason === "error" && isQuotaExhaustedError(message.errorMessage ?? ""),
@@ -178,19 +190,8 @@ export class PiAgentDriver implements AgentDriver {
   }
 
   #fatalError(base: number): Error | null {
-    const assistants = this.#agent.state.messages
-      .slice(base)
-      .filter((message) => message.role === "assistant") as {
-      readonly stopReason?: string
-      readonly errorMessage?: string
-    }[]
-    if (assistants.length === 0) return null
-    if (
-      assistants.some(
-        (message) => message.stopReason !== "error" && message.stopReason !== "aborted",
-      )
-    )
-      return null
+    const assistants = appendedAssistantOutcomes(this.#agent.state.messages, base)
+    if (!exclusivelyFailed(assistants)) return null
     const failed = assistants.find(
       (message) => message.stopReason === "error" && message.errorMessage !== undefined,
     )
