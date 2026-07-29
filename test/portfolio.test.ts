@@ -44,6 +44,44 @@ test("模拟持仓计算总资产、持仓市值和浮动盈亏", () => {
   expectFrameFits(rawFrame, 40)
 })
 
+test("浮动盈亏与个股盈亏显示正负百分比", () => {
+  const portfolio = new PortfolioWorkspace({
+    initialCapital: 100_000,
+    cash: 60_000,
+    positions: [
+      {
+        code: "600519",
+        name: "贵州茅台",
+        quantity: 100,
+        sellableQuantity: 100,
+        averageCost: 400,
+        currentPrice: 420,
+      },
+      {
+        code: "000001",
+        name: "平安银行",
+        quantity: 1_000,
+        sellableQuantity: 1_000,
+        averageCost: 10,
+        currentPrice: 9.5,
+      },
+    ],
+  })
+  const frame = portfolio.render(44).map(stripVTControlCharacters).join("\n")
+  const positionLine = (code: string) => frame.split("\n").find((line) => line.includes(code)) ?? ""
+
+  // 浮动盈亏 +1,500.00 / 成本 50,000.00 = +3.00%，百分比在左、金额在右
+  expect(frame).toContain("+3.00% +¥1,500.00")
+  const gain = positionLine("600519")
+  expect(gain).toContain("+5.00%")
+  expect(gain).toContain("+¥2,000.00")
+  expect(gain.indexOf("+5.00%")).toBeLessThan(gain.indexOf("+¥2,000.00"))
+  const loss = positionLine("000001")
+  expect(loss).toContain("-5.00%")
+  expect(loss).toContain("-¥500.00")
+  expect(loss.indexOf("-5.00%")).toBeLessThan(loss.indexOf("-¥500.00"))
+})
+
 test("空模拟账户明确显示可用资金和等待交易状态", () => {
   const frame = new PortfolioWorkspace().render(36).map(stripVTControlCharacters).join("\n")
 

@@ -73,6 +73,8 @@ export class PortfolioWorkspace implements Component {
     const profitColorCode = profitColor(summary.totalProfit)
     const unrealizedColorCode = profitColor(summary.unrealizedProfit)
     const realizedColorCode = profitColor(summary.realizedProfit)
+    const unrealizedPercent =
+      summary.costBasis === 0 ? 0 : (summary.unrealizedProfit / summary.costBasis) * 100
     const lines: string[] = [
       fitLine(`持仓 / 模拟账户 ${ANSI.brightBlack}[模拟]${ANSI.reset}`, safeWidth),
       "─".repeat(safeWidth),
@@ -81,7 +83,7 @@ export class PortfolioWorkspace implements Component {
       metricRow("持仓市值", formatMoney(summary.marketValue), safeWidth),
       metricRow(
         "浮动盈亏",
-        `${unrealizedColorCode}${formatMoney(summary.unrealizedProfit, true)}${ANSI.reset}`,
+        `${unrealizedColorCode}${formatPercent(unrealizedPercent)} ${formatMoney(summary.unrealizedProfit, true)}${ANSI.reset}`,
         safeWidth,
       ),
       metricRow(
@@ -105,8 +107,12 @@ export class PortfolioWorkspace implements Component {
 
     for (const position of this.#snapshot.positions) {
       const positionProfit = position.quantity * (position.currentPrice - position.averageCost)
+      const positionPercent =
+        position.averageCost === 0
+          ? 0
+          : ((position.currentPrice - position.averageCost) / position.averageCost) * 100
       const color = profitColor(positionProfit)
-      const left = `${position.code} ${position.name} ${position.quantity}股`
+      const left = `${position.code} ${position.name} ${position.quantity}股 ${color}${formatPercent(positionPercent)}${ANSI.reset}`
       const right = `${color}${formatMoney(positionProfit, true)}${ANSI.reset}`
       lines.push(fitLine(alignSides(left, right, safeWidth), safeWidth))
       const details = `可卖${position.sellableQuantity}股 · 成本 ${formatMoney(position.averageCost)} · 现价 ${formatMoney(position.currentPrice)}`
