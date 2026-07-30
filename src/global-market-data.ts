@@ -1,3 +1,4 @@
+import { withTimeout } from "./http-timeout"
 import { type ParsedMarketCode, parseMarketCode } from "./market-code"
 import type { MarketDataDiagnostic, MarketQuote, MarketSnapshot } from "./market-data"
 
@@ -6,6 +7,7 @@ export interface GlobalMarketHttp {
 }
 
 const CHART_ENDPOINT = "https://query1.finance.yahoo.com/v8/finance/chart/"
+const REQUEST_TIMEOUT_MS = 12_000
 const EXPECTED_CURRENCY: Readonly<Record<"US" | "JP" | "KR", string>> = {
   US: "USD",
   JP: "JPY",
@@ -14,9 +16,11 @@ const EXPECTED_CURRENCY: Readonly<Record<"US" | "JP" | "KR", string>> = {
 
 export class YahooGlobalMarketDataSource {
   readonly #http: GlobalMarketHttp
+  readonly #timeoutMs: number
 
-  constructor(http: GlobalMarketHttp = { fetch }) {
+  constructor(http: GlobalMarketHttp = { fetch }, timeoutMs: number = REQUEST_TIMEOUT_MS) {
     this.#http = http
+    this.#timeoutMs = timeoutMs
   }
 
   async loadSnapshot(codes: readonly string[]): Promise<MarketSnapshot> {
@@ -45,7 +49,11 @@ export class YahooGlobalMarketDataSource {
     if (parsed === null || parsed.market === "CN")
       return { diagnostic: diagnostic(code, "US", "全球股票代码无效") }
     try {
-      const response = await this.#http.fetch(chartUrl(parsed))
+      const response = await withTimeout(
+        this.#http.fetch(chartUrl(parsed)),
+        this.#timeoutMs,
+        "全球行情",
+      )
       if (!response.ok) throw new Error("上游请求失败")
       return parseChart(code, parsed, await response.json())
     } catch {

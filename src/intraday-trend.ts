@@ -15,24 +15,41 @@ export function parseTencentMinuteTrend(payload: unknown): readonly number[] {
   return prices
 }
 
-/** 逐个拉取腾讯分时数据；单只失败仅该只为空，不影响其它 */
-export const fetchTencentIntradayTrends: IntradayTrendFetcher = async (codes) => {
-  const trends = new Map<string, readonly number[]>()
-  await Promise.all(
-    codes.map(async (code) => {
-      const apiCode = code.toLowerCase()
-      try {
-        const response = await fetch(
-          `https://ifzq.gtimg.cn/appstock/app/minute/query?code=${apiCode}`,
-        )
-        const json: unknown = await response.json()
-        const payload = (json as { readonly data?: Readonly<Record<string, unknown>> } | undefined)
-          ?.data?.[apiCode]
-        trends.set(code, parseTencentMinuteTrend(payload))
-      } catch {
-        trends.set(code, [])
-      }
-    }),
-  )
-  return trends
+export const INTRADAY_TREND_TIMEOUT_MS = 10_000
+
+export interface TencentIntradayTrendOptions {
+  readonly fetchImpl?: (url: string, init?: RequestInit) => Promise<Response>
+  readonly timeoutMs?: number
 }
+
+/** 逐个拉取腾讯分时数据；单只失败仅该只为空，不影响其它 */
+export function createTencentIntradayTrendFetcher(
+  options: TencentIntradayTrendOptions = {},
+): IntradayTrendFetcher {
+  const fetchImpl = options.fetchImpl ?? fetch
+  const timeoutMs = options.timeoutMs ?? INTRADAY_TREND_TIMEOUT_MS
+  return async (codes) => {
+    const trends = new Map<string, readonly number[]>()
+    await Promise.all(
+      codes.map(async (code) => {
+        const apiCode = code.toLowerCase()
+        try {
+          const response = await fetchImpl(
+            `https://ifzq.gtimg.cn/appstock/app/minute/query?code=${apiCode}`,
+            { signal: AbortSignal.timeout(timeoutMs) },
+          )
+          const json: unknown = await response.json()
+          const payload = (
+            json as { readonly data?: Readonly<Record<string, unknown>> } | undefined
+          )?.data?.[apiCode]
+          trends.set(code, parseTencentMinuteTrend(payload))
+        } catch {
+          trends.set(code, [])
+        }
+      }),
+    )
+    return trends
+  }
+}
+
+export const fetchTencentIntradayTrends: IntradayTrendFetcher = createTencentIntradayTrendFetcher()

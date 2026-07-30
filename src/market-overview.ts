@@ -38,6 +38,16 @@ export interface MarketMover {
   readonly turnoverRate: number
 }
 
+export interface MarketCapitalSummary {
+  readonly shMainNetInflow: number | null
+  readonly szMainNetInflow: number | null
+  readonly northbound: {
+    readonly shTurnover: number
+    readonly szTurnover: number
+    readonly leadStock: string
+  } | null
+}
+
 export interface MarketOverviewSnapshot {
   readonly indices: readonly MarketIndexOverview[]
   readonly breadth: MarketBreadth | null
@@ -50,11 +60,13 @@ export interface MarketOverviewSnapshot {
     readonly gainers: readonly MarketMover[]
     readonly losers: readonly MarketMover[]
   } | null
+  readonly capital: MarketCapitalSummary | null
   readonly availability: {
     readonly indices: boolean
     readonly breadth: boolean
     readonly sectors: boolean
     readonly movers: boolean
+    readonly capital: boolean
     readonly errors: readonly string[]
   }
   readonly source: string

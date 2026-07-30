@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { MarketOverviewService, type MarketOverviewSnapshot } from "../src/market-overview"
 import {
+  type MarketIndexQuoteClient,
   type MarketOverviewFetcher,
   PublicMarketOverviewDataSource,
 } from "../src/market-overview-source"
@@ -91,7 +92,15 @@ function overviewSnapshot(): MarketOverviewSnapshot {
     },
     sectors: { leaders: [], laggards: [], totalTurnover: 0 },
     movers: { gainers: [], losers: [] },
-    availability: { indices: false, breadth: true, sectors: true, movers: true, errors: [] },
+    capital: null,
+    availability: {
+      indices: false,
+      breadth: true,
+      sectors: true,
+      movers: true,
+      capital: false,
+      errors: [],
+    },
     source: "test",
     updatedAt: 1,
   }
@@ -103,6 +112,8 @@ describe("全市场大盘快照", () => {
       { getStocks: async () => INDEX_QUOTES },
       overviewFetcher(),
       () => 1_783_992_000_000,
+      10_000,
+      async () => null,
     )
 
     const snapshot = await source.loadOverview()
@@ -151,8 +162,69 @@ describe("全市场大盘快照", () => {
 
   test("关键公共接口全部失败时明确拒绝不完整快照", async () => {
     const failedFetcher: MarketOverviewFetcher = async () => ({ ok: false, status: 503, body: "" })
-    const source = new PublicMarketOverviewDataSource({ getStocks: async () => [] }, failedFetcher)
+    const source = new PublicMarketOverviewDataSource(
+      { getStocks: async () => [] },
+      failedFetcher,
+      Date.now,
+      10_000,
+      async () => null,
+    )
 
     await expect(source.loadOverview()).rejects.toThrow("大盘数据")
+  })
+
+  test("指数行情请求超时后计入错误而不是永久挂起", async () => {
+    const hanging: MarketIndexQuoteClient = {
+      getStocks: () => new Promise(() => {}),
+    }
+    const failedFetcher: MarketOverviewFetcher = async () => ({ ok: false, status: 503, body: "" })
+    const source = new PublicMarketOverviewDataSource(
+      hanging,
+      failedFetcher,
+      Date.now,
+      20,
+      async () => null,
+    )
+
+    await expect(source.loadOverview()).rejects.toThrow("主要指数")
+  })
+
+  test("资金北向聚合并入大盘快照", async () => {
+    const capital = {
+      shMainNetInflow: -4_837_175_296,
+      szMainNetInflow: -1_000_000_000,
+      northbound: { shTurnover: 512_000.5, szTurnover: 341_408.12, leadStock: "贵州茅台" },
+    }
+    const source = new PublicMarketOverviewDataSource(
+      { getStocks: async () => INDEX_QUOTES },
+      overviewFetcher(),
+      () => 1_783_992_000_000,
+      10_000,
+      async () => capital,
+    )
+
+    const snapshot = await source.loadOverview()
+
+    expect(snapshot.capital).toEqual(capital)
+    expect(snapshot.availability.capital).toBe(true)
+  })
+
+  test("资金北向失败时记入错误但不影响其它板块", async () => {
+    const source = new PublicMarketOverviewDataSource(
+      { getStocks: async () => INDEX_QUOTES },
+      overviewFetcher(),
+      () => 1_783_992_000_000,
+      10_000,
+      async () => {
+        throw new Error("东财接口不可用")
+      },
+    )
+
+    const snapshot = await source.loadOverview()
+
+    expect(snapshot.capital).toBeNull()
+    expect(snapshot.availability.capital).toBe(false)
+    expect(snapshot.availability.errors.join("；")).toContain("资金北向")
+    expect(snapshot.indices).toHaveLength(1)
   })
 })

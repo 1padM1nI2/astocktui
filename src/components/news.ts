@@ -119,7 +119,9 @@ export class NewsWorkspace implements Component {
     let status = `${ANSI.brightBlack}[未加载 · R刷新]${ANSI.reset}`
     if (this.#status === "loading") status = `${ANSI.yellow}[更新中]${ANSI.reset}`
     else if (this.#status === "ready") {
-      status = `${ANSI.brightBlack}[${this.#source} · R刷新]${ANSI.reset}`
+      const cachedAt = this.#snapshot?.cachedAt
+      const cached = cachedAt === undefined ? "" : ` · 缓存 ${TIME_FORMATTER.format(cachedAt)}`
+      status = `${ANSI.brightBlack}[${this.#source}${cached} · R刷新]${ANSI.reset}`
     } else if (this.#status === "error") {
       status = `${ANSI.brightRed}[获取失败 · R重试]${ANSI.reset}`
     }

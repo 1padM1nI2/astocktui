@@ -8,6 +8,11 @@ import { AppInputHandler } from "./app-input"
 import { MARKET, renderAppFrame, WORKSPACE_INDEX } from "./app-render"
 import { AutoRefreshController, type RefreshScheduler } from "./auto-refresh"
 import { AutomationRuntime, type AutomationRuntimeOptions } from "./automation-runtime"
+import {
+  applyStartupCaches,
+  createCachedMarketDataSource,
+  createCachedNewsDataSource,
+} from "./cached-sources"
 import { CommandPrompt } from "./command-prompt"
 import {
   type CommandContext,
@@ -19,12 +24,11 @@ import { MarketWorkspace } from "./components/market"
 import { NewsWorkspace } from "./components/news"
 import { PortfolioWorkspace } from "./components/portfolio"
 import { TradeHistoryWorkspace } from "./components/trade-history"
-import { createDefaultMarketDataSource, type MarketDataSource } from "./market-data"
+import type { MarketDataSource } from "./market-data"
 import { type MarketOverviewDataSource, MarketOverviewService } from "./market-overview"
 import { PublicMarketOverviewDataSource } from "./market-overview-source"
 import { MemoryService } from "./memory-service"
 import type { NewsDataSource } from "./news-data"
-import { NewsNowDataSource } from "./news-data"
 import { createPiAgentController } from "./pi-agent"
 import { PaperTradingService } from "./trading"
 import { isContinuousAuction } from "./trading-calendar"
@@ -63,8 +67,8 @@ export class MarketIntelligenceApp implements Component {
   readonly #memory = new MemoryService({ trades: () => this.#trading.trades })
 
   constructor(
-    marketSource: MarketDataSource = createDefaultMarketDataSource(),
-    newsSource: NewsDataSource = new NewsNowDataSource(),
+    marketSource: MarketDataSource = createCachedMarketDataSource(),
+    newsSource: NewsDataSource = createCachedNewsDataSource(),
     viewportRows?: () => number,
     trading: PaperTradingService = new PaperTradingService(),
     refreshScheduler?: RefreshScheduler,
@@ -132,6 +136,7 @@ export class MarketIntelligenceApp implements Component {
     this.#agent.subscribe(() => this.onUpdate())
     this.#extensions.subscribe(() => this.onUpdate())
     void this.#extensions.initialize().then(() => this.onUpdate())
+    applyStartupCaches(this.#market, this.#news)
   }
 
   refreshMarket(): Promise<void> {

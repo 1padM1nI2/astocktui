@@ -59,8 +59,16 @@ function toolContext(): {
     },
     sectors: { leaders: [], laggards: [], totalTurnover: 1_000_000_000_000 },
     movers: { gainers: [], losers: [] },
+    capital: null,
     source: "test-overview",
-    availability: { indices: false, breadth: true, sectors: true, movers: true, errors: [] },
+    availability: {
+      indices: false,
+      breadth: true,
+      sectors: true,
+      movers: true,
+      capital: false,
+      errors: [],
+    },
     updatedAt: 1_752_634_800_000,
   }
   const news: FinancialNewsSnapshot = {

@@ -1,7 +1,9 @@
-import { stocks } from "stock-api"
 import { YahooGlobalMarketDataSource } from "./global-market-data"
+import { withTimeout } from "./http-timeout"
 import { fetchTencentIntradayTrends, type IntradayTrendFetcher } from "./intraday-trend"
 import { isAshareCode, normalizeMarketCode, parseMarketCode, type StockMarket } from "./market-code"
+import { ResilientStockApiClient } from "./resilient-stock-api"
+import { type StockApiClient, type StockApiKline, toKlineBars } from "./stock-api-types"
 import { fetchTencentStockDetails, type StockDetail, type StockDetailFetcher } from "./stock-detail"
 
 export interface WatchlistItem {
@@ -63,78 +65,40 @@ export interface MarketSnapshot {
   readonly klinesByCode?: Readonly<Record<string, readonly KlineBar[]>>
   readonly source: string
   readonly diagnostics?: readonly MarketDataDiagnostic[]
+  readonly cachedAt?: number
 }
 
 export interface MarketDataSource {
   loadSnapshot(codes: readonly string[]): Promise<MarketSnapshot>
 }
 
-export interface StockApiQuote {
-  readonly code: string
-  readonly name: string
-  readonly percent: number
-  readonly now: number
-  readonly low: number
-  readonly high: number
-  readonly yesterday: number
-  readonly volume?: number
-  readonly source?: string
-}
-
-export interface StockApiKline {
-  readonly close: number
-  readonly date?: string
-  readonly open?: number
-  readonly high?: number
-  readonly low?: number
-  readonly volume?: number
-}
-
-export interface StockApiKlineOptions {
-  readonly period?: "day" | "week" | "month"
-  readonly count?: number
-}
-
-export interface StockApiClient {
-  getStocks(codes: string[]): Promise<readonly StockApiQuote[]>
-  getKlines(code: string, options?: StockApiKlineOptions): Promise<readonly StockApiKline[]>
-}
-
-export function toKlineBars(klines: readonly StockApiKline[]): readonly KlineBar[] {
-  return klines
-    .filter((kline) => Number.isFinite(kline.close) && kline.close > 0)
-    .map((kline) => ({
-      date: kline.date ?? "",
-      open: typeof kline.open === "number" && kline.open > 0 ? kline.open : kline.close,
-      close: kline.close,
-      high: typeof kline.high === "number" && kline.high > 0 ? kline.high : kline.close,
-      low: typeof kline.low === "number" && kline.low > 0 ? kline.low : kline.close,
-      ...(typeof kline.volume === "number" && kline.volume > 0 ? { volume: kline.volume } : {}),
-    }))
-}
-
 const KLINE_CACHE_TTL_MS = 5 * 60_000
+const STOCK_API_TIMEOUT_MS = 10_000
+const KNOWN_SOURCES: ReadonlySet<string> = new Set(["tencent", "sina", "eastmoney", "stock-api"])
 
 export class StockApiMarketDataSource implements MarketDataSource {
   readonly #client: StockApiClient
   readonly #now: () => number
   readonly #detailFetcher: StockDetailFetcher | undefined
   readonly #intradayFetcher: IntradayTrendFetcher | undefined
+  readonly #requestTimeoutMs: number
   readonly #klineCache = new Map<
     string,
     { readonly at: number; readonly klines: readonly StockApiKline[] }
   >()
 
   constructor(
-    client: StockApiClient = stocks.auto,
+    client: StockApiClient = new ResilientStockApiClient(),
     now: () => number = Date.now,
     detailFetcher: StockDetailFetcher | undefined = fetchTencentStockDetails,
     intradayFetcher: IntradayTrendFetcher | undefined = fetchTencentIntradayTrends,
+    requestTimeoutMs: number = STOCK_API_TIMEOUT_MS,
   ) {
     this.#client = client
     this.#now = now
     this.#detailFetcher = detailFetcher
     this.#intradayFetcher = intradayFetcher
+    this.#requestTimeoutMs = requestTimeoutMs
   }
 
   async loadSnapshot(codes: readonly string[]): Promise<MarketSnapshot> {
@@ -142,7 +106,7 @@ export class StockApiMarketDataSource implements MarketDataSource {
     if (focusCode === undefined) throw new Error("自选股为空")
 
     const [rawQuotes, klines, details, intradayTrends] = await Promise.all([
-      this.#client.getStocks([...codes]),
+      withTimeout(this.#client.getStocks([...codes]), this.#requestTimeoutMs, "实时行情"),
       Promise.all(codes.map((code) => this.#loadKlines(code))),
       this.#detailFetcher?.(codes).catch((): ReadonlyMap<string, StockDetail> => new Map()) ??
         Promise.resolve(new Map<string, StockDetail>()),
@@ -156,19 +120,9 @@ export class StockApiMarketDataSource implements MarketDataSource {
     let snapshotSource = ""
     for (const quote of rawQuotes) {
       const source = quote.source ?? "stock-api"
-      let hasControlCharacter = false
-      for (let index = 0; index < quote.name.length; index++) {
-        const codeUnit = quote.name.charCodeAt(index)
-        if (codeUnit < 0x20 || (codeUnit >= 0x7f && codeUnit <= 0x9f)) {
-          hasControlCharacter = true
-          break
-        }
-      }
-      const isKnownSource =
-        source === "tencent" ||
-        source === "sina" ||
-        source === "eastmoney" ||
-        source === "stock-api"
+      const hasControlCharacter = Array.from(quote.name, (char) => char.charCodeAt(0)).some(
+        (codeUnit) => codeUnit < 0x20 || (codeUnit >= 0x7f && codeUnit <= 0x9f),
+      )
       if (
         !/^(SH|SZ)\d{6}$/.test(quote.code) ||
         quote.name.trim().length === 0 ||
@@ -177,7 +131,7 @@ export class StockApiMarketDataSource implements MarketDataSource {
         quote.now <= 0 ||
         !Number.isFinite(quote.percent) ||
         hasControlCharacter ||
-        !isKnownSource
+        !KNOWN_SOURCES.has(source)
       ) {
         continue
       }
@@ -241,9 +195,11 @@ export class StockApiMarketDataSource implements MarketDataSource {
   async #loadKlines(code: string): Promise<readonly StockApiKline[]> {
     const cached = this.#klineCache.get(code)
     if (cached !== undefined && this.#now() - cached.at < KLINE_CACHE_TTL_MS) return cached.klines
-    const klines = await this.#client
-      .getKlines(code, { period: "day", count: 60 })
-      .catch((): readonly StockApiKline[] => [])
+    const klines = await withTimeout(
+      this.#client.getKlines(code, { period: "day", count: 60 }),
+      this.#requestTimeoutMs,
+      "日 K 线",
+    ).catch((): readonly StockApiKline[] => [])
     this.#klineCache.set(code, { at: this.#now(), klines })
     return klines
   }

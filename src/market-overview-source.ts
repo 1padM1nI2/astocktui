@@ -1,7 +1,8 @@
-import { stocks } from "stock-api"
-import type { StockApiQuote } from "./market-data"
+import { fetchCapitalSummary } from "./eastmoney-extra"
+import { withTimeout } from "./http-timeout"
 import type {
   MarketBreadth,
+  MarketCapitalSummary,
   MarketIndexOverview,
   MarketMover,
   MarketOverviewDataSource,
@@ -16,6 +17,8 @@ import {
   parseSector,
   recordField,
 } from "./market-overview-parsers"
+import { ResilientStockApiClient } from "./resilient-stock-api"
+import type { StockApiQuote } from "./stock-api-types"
 
 const INDEX_CODES = [
   "SH000001",
@@ -32,6 +35,7 @@ const INDUSTRY_URL = "https://money.finance.sina.com.cn/q/view/newSinaHy.php"
 const MOVERS_URL =
   "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData"
 const REQUEST_TIMEOUT_MS = 12_000
+const INDEX_QUOTE_TIMEOUT_MS = 10_000
 const RESULT_LIMIT = 10
 
 export interface MarketIndexQuoteClient {
@@ -64,19 +68,27 @@ const DEFAULT_FETCHER: MarketOverviewFetcher = async (url) => {
   return { ok: response.ok, status: response.status, body }
 }
 
+export type CapitalLoader = () => Promise<MarketCapitalSummary | null>
+
 export class PublicMarketOverviewDataSource implements MarketOverviewDataSource {
   readonly #indexClient: MarketIndexQuoteClient
   readonly #fetcher: MarketOverviewFetcher
   readonly #now: () => number
+  readonly #indexTimeoutMs: number
+  readonly #capitalLoader: CapitalLoader
 
   constructor(
-    indexClient: MarketIndexQuoteClient = stocks.auto,
+    indexClient: MarketIndexQuoteClient = new ResilientStockApiClient(),
     fetcher: MarketOverviewFetcher = DEFAULT_FETCHER,
     now: () => number = Date.now,
+    indexTimeoutMs: number = INDEX_QUOTE_TIMEOUT_MS,
+    capitalLoader: CapitalLoader = fetchCapitalSummary,
   ) {
     this.#indexClient = indexClient
     this.#fetcher = fetcher
     this.#now = now
+    this.#indexTimeoutMs = indexTimeoutMs
+    this.#capitalLoader = capitalLoader
   }
 
   async loadOverview(): Promise<MarketOverviewSnapshot> {
@@ -86,12 +98,14 @@ export class PublicMarketOverviewDataSource implements MarketOverviewDataSource 
       this.#loadSectors(),
       this.#loadMovers(false),
       this.#loadMovers(true),
+      this.#loadCapital(),
     ] as const)
     const indices = fulfilled(results[0]) ?? []
     const breadth = fulfilled(results[1])
     const sectors = fulfilled(results[2])
     const gainers = fulfilled(results[3])
     const losers = fulfilled(results[4])
+    const capital = fulfilled(results[5])
     const movers =
       gainers === null && losers === null ? null : { gainers: gainers ?? [], losers: losers ?? [] }
     const errors = collectErrors(results, [
@@ -100,20 +114,27 @@ export class PublicMarketOverviewDataSource implements MarketOverviewDataSource 
       "行业板块",
       "领涨个股",
       "领跌个股",
+      "资金北向",
     ])
-    if (indices.length === 0 && breadth === null && sectors === null && movers === null) {
-      throw new Error(`没有可用大盘数据：${errors.join("；")}`)
-    }
+    const missing =
+      indices.length === 0 &&
+      breadth === null &&
+      sectors === null &&
+      movers === null &&
+      capital === null
+    if (missing) throw new Error(`没有可用大盘数据：${errors.join("；")}`)
     return {
       indices,
       breadth,
       sectors,
       movers,
+      capital,
       availability: {
         indices: indices.length > 0,
         breadth: breadth !== null,
         sectors: sectors !== null,
         movers: movers !== null,
+        capital: capital !== null,
         errors,
       },
       source: "stock-api + 东方财富 + 新浪财经",
@@ -121,8 +142,18 @@ export class PublicMarketOverviewDataSource implements MarketOverviewDataSource 
     }
   }
 
+  async #loadCapital(): Promise<MarketCapitalSummary> {
+    const capital = await this.#capitalLoader()
+    if (capital === null) throw new Error("资金北向暂不可用")
+    return capital
+  }
+
   async #loadIndices(): Promise<MarketIndexOverview[]> {
-    const quotes = await this.#indexClient.getStocks([...INDEX_CODES])
+    const quotes = await withTimeout(
+      this.#indexClient.getStocks([...INDEX_CODES]),
+      this.#indexTimeoutMs,
+      "指数行情",
+    )
     return quotes
       .filter((quote) => quote.now > 0 && quote.name !== "---")
       .map((quote) => ({

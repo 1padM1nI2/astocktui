@@ -17,6 +17,13 @@ import { renderFocusStats, renderMiniSparkline, renderSparkline, trendColor } fr
 
 const DEFAULT_NAMES = new Map(DEFAULT_WATCHLIST.map((item) => [item.code, item.name]))
 
+const TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Shanghai",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+})
+
 export class MarketWorkspace implements Component {
   #snapshot: MarketSnapshot | null = null
   #status: "idle" | "loading" | "ready" | "error" = "idle"
@@ -89,7 +96,9 @@ export class MarketWorkspace implements Component {
     let status = `${ANSI.brightBlack}[未加载 · R刷新]${ANSI.reset}`
     if (this.#status === "loading") status = `${ANSI.yellow}[更新中]${ANSI.reset}`
     else if (this.#status === "ready") {
-      status = `${ANSI.brightBlack}[数据源 ${this.#snapshot?.source ?? "stock-api"} · R刷新]${ANSI.reset}`
+      const cachedAt = this.#snapshot?.cachedAt
+      const cached = cachedAt === undefined ? "" : ` · 缓存 ${TIME_FORMATTER.format(cachedAt)}`
+      status = `${ANSI.brightBlack}[数据源 ${this.#snapshot?.source ?? "stock-api"}${cached} · R刷新]${ANSI.reset}`
     } else if (this.#status === "error") {
       status = `${ANSI.brightRed}[获取失败 · R重试]${ANSI.reset}`
     }

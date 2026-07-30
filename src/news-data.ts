@@ -9,7 +9,7 @@ export const NEWSNOW_FINANCE_SOURCE_IDS = [
   "fastbull-express",
   "jin10",
 ] as const
-const NEWS_LIMIT = 40
+export const NEWS_LIMIT = 40
 const REQUEST_TIMEOUT_MS = 10_000
 const DEFAULT_NEWSNOW_URL = "https://newsnow.busiyi.world"
 const RAW_CONFIGURED_NEWSNOW_URL = Reflect.get(Bun.env, "ASTOCK_NEWSNOW_URL")
@@ -41,6 +41,7 @@ export interface FinancialNewsItem {
 export interface FinancialNewsSnapshot {
   readonly items: readonly FinancialNewsItem[]
   readonly source: string
+  readonly cachedAt?: number
 }
 
 export interface NewsDataSource {
@@ -69,7 +70,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
-function hasUnsafeTerminalControl(text: string): boolean {
+export function hasUnsafeTerminalControl(text: string): boolean {
   for (let index = 0; index < text.length; index++) {
     const codeUnit = text.charCodeAt(index)
     const isNormalWhitespace = codeUnit === 0x09 || codeUnit === 0x0a || codeUnit === 0x0d

@@ -73,3 +73,17 @@ test("Yahoo 全球行情适配器隔离单标的失败和错误币种", async ()
     expect.objectContaining({ code: "KR:005930", market: "KR" }),
   ])
 })
+
+test("Yahoo 请求超时后返回诊断而不是永久挂起", async () => {
+  const source = new YahooGlobalMarketDataSource(
+    { fetch: () => new Promise<Response>(() => {}) },
+    20,
+  )
+
+  const snapshot = await source.loadSnapshot(["US:AAPL"])
+
+  expect(snapshot.quotes).toEqual([])
+  expect(snapshot.diagnostics).toEqual([
+    { code: "US:AAPL", market: "US", message: "全球行情暂不可用" },
+  ])
+})
