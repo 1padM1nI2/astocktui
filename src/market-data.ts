@@ -1,4 +1,4 @@
-import { YahooGlobalMarketDataSource } from "./global-market-data"
+import { TencentGlobalMarketDataSource } from "./global-market-data"
 import { withTimeout } from "./http-timeout"
 import { fetchTencentIntradayTrends, type IntradayTrendFetcher } from "./intraday-trend"
 import { isAshareCode, normalizeMarketCode, parseMarketCode, type StockMarket } from "./market-code"
@@ -211,7 +211,7 @@ export class CompositeMarketDataSource implements MarketDataSource {
 
   constructor(
     local: MarketDataSource = new StockApiMarketDataSource(),
-    global: MarketDataSource = new YahooGlobalMarketDataSource(),
+    global: MarketDataSource = new TencentGlobalMarketDataSource(),
   ) {
     this.#local = local
     this.#global = global
@@ -258,7 +258,7 @@ export class CompositeMarketDataSource implements MarketDataSource {
 
 export function createDefaultMarketDataSource(
   local: MarketDataSource = new StockApiMarketDataSource(),
-  global: MarketDataSource = new YahooGlobalMarketDataSource(),
+  global: MarketDataSource = new TencentGlobalMarketDataSource(),
 ): MarketDataSource {
   return new CompositeMarketDataSource(local, global)
 }
