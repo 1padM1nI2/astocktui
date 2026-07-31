@@ -91,6 +91,25 @@ describe("Agent 会话持久化", () => {
     }
   })
 
+  test("随会话保存并恢复思考等级", () => {
+    const directory = tempDir()
+    try {
+      const path = join(directory, "agent-session.json")
+      const store = new AgentSessionStore(path)
+
+      store.save([USER_MESSAGE], { thinkingLevel: "high" })
+      expect(store.load().state.thinkingLevel).toBe("high")
+
+      store.save([USER_MESSAGE], { thinkingLevel: "default" })
+      expect(store.load().state.thinkingLevel).toBe("default")
+
+      store.save([USER_MESSAGE])
+      expect(store.load().state.thinkingLevel).toBeUndefined()
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
   test("保存空消息列表覆盖旧会话", () => {
     const directory = tempDir()
     try {

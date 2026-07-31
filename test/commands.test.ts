@@ -90,6 +90,7 @@ describe("应用命令注册表", () => {
       "task",
       "memory",
       "model",
+      "think",
       "quote",
       "quit",
     ])

@@ -55,6 +55,12 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 - Accessibility: every field has stable textual labels; color is supplemental to sign text.
 - Keyboard: Up, Down, PageUp, PageDown, Home, End scroll the watchlist when it overflows the panel.
 
+### HotRankWorkspace
+- Structure: an alternate view of the market panel showing the Eastmoney 股吧 popularity board: rank, code, name, latest price, change percent, and rank shift (red `↑N` rising, green `↓N` falling); suspended quotes render as `--`.
+- Data: loads lazily on first view via the login-free popularity API, then batches quote enrichment; quote failure degrades to bare codes without failing the board.
+- States: placeholder, populated, refreshing, refresh-failed; header shows source, update time, and the `R刷新 · H返回` hints.
+- Keyboard: `h` toggles the market panel between watchlist and popularity board; `R` refreshes whichever board is visible; Up, Down, PageUp, PageDown, Home, End scroll the board when it overflows the panel.
+
 ### MarketOverviewService
 - Coverage: seven major A-share indices, market-wide rise/fall distribution, counts at or beyond ±10%, industry leaders and laggards, aggregated industry turnover, and top gaining/losing stocks.
 - Sources: index quotes use `stock-api`; breadth uses Eastmoney's public distribution endpoint; industry and mover rankings use Sina Finance public endpoints with GB18030 decoding where required.
@@ -92,7 +98,7 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 - Structure: bordered primary panel backed by `@oh-my-pi/pi-agent-core`, with streamed Markdown answers, live tool lifecycle rows, provider/model identity, bottom-anchored command suggestions, and a bottom-pinned prompt input. The subtitle line also shows the long-term memory entry count.
 - Markdown: Pi TUI parses headings, emphasis, inline/code blocks, links, quotes, rules, and ordered/unordered lists into ANSI terminal styles. Raw markers are removed, deep headings are flattened for compact panels, unordered bullets use `•`, and CJK-aware wrapping keeps every rendered line within the supplied width.
 - Configuration: `ASTOCK_AGENT_PROVIDER` and `ASTOCK_AGENT_MODEL` select any bundled Pi model; the default is `openai/gpt-4o-mini`. `ASTOCK_AGENT_BASE_URL` overrides the selected model endpoint, while OpenAI also accepts `OPENAI_BASE_URL`; only HTTP(S) endpoints are accepted. Provider credentials use Pi's standard environment variables such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GEMINI_API_KEY`. Missing credentials produce an explicit unconfigured state without issuing a request.
-- Tools: status, watchlist quotes, full-market overview, filtered multi-source financial news, portfolio, trade history, refresh, watchlist management, trade preview, simulated trade execution, simulated account reset, long-term memory, and workspace focus all use the same application services as keyboard commands.
+- Tools: status, watchlist quotes, full-market overview, filtered multi-source financial news, 股吧 popularity board, portfolio, trade history, refresh, watchlist management, trade preview, simulated trade execution, simulated account reset, long-term memory, and workspace focus all use the same application services as keyboard commands.
 - Trading safety: Agent orders only affect the persisted local paper account and retain lot, cash, fee, and T+1 checks. `execute_trade` is blocked unless the current user request explicitly authorizes trading or autonomous simulated operation; negative instructions win. Account reset additionally requires explicit reset wording and the tool's `RESET` confirmation.
 - States: unconfigured, waiting, streaming, tool-running, tool-complete, completed, error, command-running, and input-focus; provider and asynchronous command results replace pending states when complete.
 - Diagnostics: every tool call (timestamp, name, arguments, result, error flag, duration) is appended as JSONL to `agent-tool-calls.log` in the app-data directory, rotated at 2 MiB with a single `.1` backup.

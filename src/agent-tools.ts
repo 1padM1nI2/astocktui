@@ -57,7 +57,8 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
     {
       name: "get_market_snapshot",
       label: "读取实时行情",
-      description: "读取当前自选股报价、涨跌幅和走势图数据。分析股票前优先调用。",
+      description:
+        "读取当前自选股报价、涨跌幅和走势图数据，全球股票含 market、currency、marketState 字段，部分失败见 diagnostics。分析股票前优先调用。",
       parameters: z.object({}),
       intent: "omit",
       approval: "read",
@@ -120,6 +121,32 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
       execute: async () => jsonResult(context.portfolio()),
     },
     {
+      name: "get_hot_rank",
+      label: "读取股吧人气榜",
+      description:
+        "读取东方财富股吧个股人气榜，含人气排名、最新价、涨跌幅和排名变动，反映散户关注度与舆情热度。分析个股舆情、散户情绪或关注度异动时调用。",
+      parameters: z.object({
+        refresh: z.boolean().optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      }),
+      intent: "omit",
+      approval: "read",
+      execute: async (_id, params) => {
+        const input = params as { readonly refresh?: boolean; readonly limit?: number }
+        const snapshot = await context.hotRank?.(input.refresh === true)
+        if (snapshot === undefined || snapshot === null) {
+          return jsonResult({ status: "not_loaded" })
+        }
+        const limit = Math.min(100, Math.max(1, input.limit ?? 50))
+        return jsonResult({
+          source: snapshot.source,
+          updatedAt: snapshot.updatedAt,
+          total: snapshot.items.length,
+          items: snapshot.items.slice(0, limit),
+        })
+      },
+    },
+    {
       name: "get_trade_history",
       label: "读取成交记录",
       description: "读取本地模拟账户的完整成交记录。",
@@ -144,7 +171,8 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
     {
       name: "manage_watchlist",
       label: "管理行情自选股",
-      description: "查看、添加或删除行情窗口自选股。股票代码支持六位代码或 SH/SZ 前缀。",
+      description:
+        "查看、添加或删除行情窗口自选股。代码支持六位 A 股或 SH/SZ 前缀，以及美股 US:（如 US:AAPL、指数 US:^IXIC）、日股 JP:（如 JP:7203）、韩股 KR:（如 KR:005930）。",
       parameters: z.object({
         action: z.enum(["list", "add", "remove"]),
         code: z.string().optional(),

@@ -12,6 +12,7 @@ function inputFixture(): {
   readonly tradeKeys: string[]
   readonly executed: string[]
   quits: number
+  toggles: number
   marketConsume: boolean
   newsConsume: boolean
   tab: number
@@ -23,7 +24,7 @@ function inputFixture(): {
   const portfolioKeys: string[] = []
   const tradeKeys: string[] = []
   const executed: string[] = []
-  const state = { tab: 0, quits: 0, marketConsume: true, newsConsume: true }
+  const state = { tab: 0, quits: 0, toggles: 0, marketConsume: true, newsConsume: true }
   return {
     prompt,
     marketKeys,
@@ -36,6 +37,12 @@ function inputFixture(): {
     },
     set quits(value: number) {
       state.quits = value
+    },
+    get toggles() {
+      return state.toggles
+    },
+    set toggles(value: number) {
+      state.toggles = value
     },
     get marketConsume() {
       return state.marketConsume
@@ -69,6 +76,9 @@ function inputFixture(): {
       promptAgent: () => {},
       refreshMarket: () => {},
       refreshNews: () => {},
+      toggleMarketPanel: () => {
+        state.toggles++
+      },
       handleNewsInput: (data) => {
         newsKeys.push(data)
         return state.newsConsume
@@ -117,6 +127,22 @@ test("行情与持仓工作区接收滚动翻页按键", () => {
   fixture.setTab(4)
   fixture.handler.handle("\x1b[5~")
   expect(fixture.tradeKeys).toEqual(["\x1b[5~"])
+})
+
+test("行情页按 h 切换人气榜面板，其他标签页不触发", () => {
+  const fixture = inputFixture()
+
+  fixture.handler.handle("h")
+  expect(fixture.toggles).toBe(1)
+  expect(fixture.marketKeys).toEqual([])
+
+  fixture.handler.handle("H")
+  expect(fixture.toggles).toBe(2)
+  expect(fixture.marketKeys).toEqual([])
+
+  fixture.setTab(2)
+  fixture.handler.handle("h")
+  expect(fixture.toggles).toBe(2)
 })
 
 test("粘贴的命令保留为可编辑命令而不立即执行", () => {

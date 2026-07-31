@@ -6,6 +6,7 @@ import type { AgentTool } from "@oh-my-pi/pi-agent-core"
 import { toolWireSchema } from "@oh-my-pi/pi-ai"
 import { createAStockAgentTools } from "../src/agent-tools"
 import type { CommandContext } from "../src/commands"
+import type { HotRankSnapshot } from "../src/eastmoney-hot-rank"
 import type { MarketSnapshot } from "../src/market-data"
 import type { MarketOverviewSnapshot } from "../src/market-overview"
 import type { FinancialNewsSnapshot } from "../src/news-data"
@@ -177,6 +178,7 @@ describe("AStock Pi Agent 工具", () => {
       "get_market_overview",
       "get_financial_news",
       "get_portfolio",
+      "get_hot_rank",
       "get_trade_history",
       "refresh_data",
       "manage_watchlist",
@@ -198,6 +200,17 @@ describe("AStock Pi Agent 工具", () => {
       "forget_memory",
       "replace_memories",
     ])
+  })
+
+  test("行情工具描述告知 Agent 全球代码格式与市场元数据", () => {
+    const tools = createAStockAgentTools(toolContext().context)
+    const watchlist = tools.find((tool) => tool.name === "manage_watchlist")
+    const snapshot = tools.find((tool) => tool.name === "get_market_snapshot")
+    expect(watchlist?.description).toContain("US:AAPL")
+    expect(watchlist?.description).toContain("JP:")
+    expect(watchlist?.description).toContain("KR:")
+    expect(snapshot?.description).toContain("marketState")
+    expect(snapshot?.description).toContain("diagnostics")
   })
 
   test("Agent 通过显式工具管理自定义定时任务", async () => {
@@ -450,5 +463,71 @@ describe("AStock Pi Agent 工具", () => {
     expect(state.watchlist).toContain("SZ000938")
     expect(state.focused).toEqual(["portfolio", "trade"])
     expect(state.trading.snapshot.positions).toEqual([])
+  })
+})
+
+describe("股吧人气榜工具", () => {
+  const HOT_RANK: HotRankSnapshot = {
+    items: [
+      {
+        code: "SH603986",
+        rank: 1,
+        rankChange: 2,
+        name: "兆易创新",
+        price: 371.1,
+        changePercent: 1.94,
+      },
+      {
+        code: "SZ001309",
+        rank: 2,
+        rankChange: -1,
+        name: "德明利",
+        price: 390.04,
+        changePercent: -5.5,
+      },
+    ],
+    source: "东财股吧人气",
+    updatedAt: 1_753_900_000_000,
+  }
+
+  test("上下文未接入或未加载时返回 not_loaded", async () => {
+    expect(await runTool(createAStockAgentTools(toolContext().context), "get_hot_rank")).toEqual({
+      status: "not_loaded",
+    })
+    const unloaded = { ...toolContext().context, hotRank: async () => null }
+    expect(await runTool(createAStockAgentTools(unloaded), "get_hot_rank")).toEqual({
+      status: "not_loaded",
+    })
+  })
+
+  test("返回人气榜条目并按 limit 截断", async () => {
+    const context = { ...toolContext().context, hotRank: async () => HOT_RANK }
+    const tools = createAStockAgentTools(context)
+
+    expect(await runTool(tools, "get_hot_rank", { limit: 1 })).toEqual({
+      source: "东财股吧人气",
+      updatedAt: 1_753_900_000_000,
+      total: 2,
+      items: [HOT_RANK.items[0]],
+    })
+    const full = (await runTool(tools, "get_hot_rank")) as { readonly total: number }
+    expect(full.total).toBe(2)
+  })
+
+  test("refresh 参数透传给数据源", async () => {
+    const calls: (boolean | undefined)[] = []
+    const context = {
+      ...toolContext().context,
+      hotRank: async (refresh?: boolean) => {
+        calls.push(refresh)
+        return HOT_RANK
+      },
+    }
+    const tools = createAStockAgentTools(context)
+
+    await runTool(tools, "get_hot_rank")
+    await runTool(tools, "get_hot_rank", { refresh: true })
+
+    expect(calls).toEqual([false, true])
   })
 })

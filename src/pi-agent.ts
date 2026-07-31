@@ -72,7 +72,8 @@ export function createPiAgentController(
     configurationError: configurationError ?? "none",
   })
   const sessionStore = new AgentSessionStore()
-  const restoredMessages = sessionStore.load().state.messages
+  const sessionState = sessionStore.load().state
+  const restoredMessages = sessionState.messages
   const agent = new Agent({
     initialState: {
       systemPrompt: SYSTEM_PROMPT,
@@ -118,16 +119,34 @@ export function createPiAgentController(
   const restoredHistory = messagesToExchanges(restoredMessages as AgentMessage[], (name) =>
     driver.toolLabel(name),
   )
+  if (sessionState.thinkingLevel !== undefined) {
+    try {
+      driver.setThinkingLevel(sessionState.thinkingLevel)
+    } catch {
+      // 忽略会话中已失效的思考等级
+    }
+  }
   if (extensions !== undefined) {
     const sync = () => driver.setExtensions(tools, extensions)
     extensions.subscribe(sync)
     sync()
   }
-  return new AgentController(driver, () => driver.modelLabel, configurationError, restoredHistory, {
-    current: () => driver.modelLabel,
-    list: () => driver.modelLabels(),
-    select: (target) => driver.selectModel(target),
-  })
+  return new AgentController(
+    driver,
+    () => driver.modelLabel,
+    configurationError,
+    restoredHistory,
+    {
+      current: () => driver.modelLabel,
+      list: () => driver.modelLabels(),
+      select: (target) => driver.selectModel(target),
+    },
+    {
+      current: () => driver.thinkingLevel,
+      list: () => driver.thinkingLevels(),
+      select: (target) => driver.setThinkingLevel(target),
+    },
+  )
 }
 
 function configuredValue(name: string): string | undefined {

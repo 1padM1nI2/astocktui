@@ -102,6 +102,10 @@ class StubAgent {
   }
   tools: { name: string }[] = []
   beforeToolCall: unknown
+  thinkingLevel: unknown
+  setThinkingLevel(level: unknown): void {
+    this.thinkingLevel = level
+  }
   async prompt(input: string): Promise<void> {
     this.state.messages.push({ role: "user" })
     this.#respond(input)
@@ -377,6 +381,36 @@ test("截断续写达到上限后收尾，避免无限生成", async () => {
   await driver.run("分析一下", () => {})
 
   expect(agent.continued).toBe(3)
+})
+
+test("思考等级：设置、查看并随会话持久化", () => {
+  const agent = new StubAgent(null)
+  const saved: ({ readonly thinkingLevel?: string } | undefined)[] = []
+  const sessionStore = {
+    save: (_messages: unknown, extras?: { readonly thinkingLevel?: string }) => {
+      saved.push(extras)
+    },
+  }
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+    sessionStore as never,
+  )
+
+  expect(driver.thinkingLevel).toBe("default")
+  expect(driver.thinkingLevels()).toContain("high")
+
+  expect(driver.setThinkingLevel("HIGH")).toBe("high")
+  expect(agent.thinkingLevel).toBe("high")
+  expect(driver.thinkingLevel).toBe("high")
+  expect(saved.at(-1)).toEqual({ thinkingLevel: "high" })
+
+  expect(driver.setThinkingLevel("default")).toBe("default")
+  expect(agent.thinkingLevel).toBeUndefined()
+
+  expect(() => driver.setThinkingLevel("extreme")).toThrow("无效思考等级")
 })
 
 test("装配扩展工具时按名去重并记录调试事件", () => {

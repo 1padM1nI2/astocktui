@@ -20,10 +20,12 @@ import {
   type RefreshReport,
   type RefreshTarget,
 } from "./commands"
+import { HotRankWorkspace } from "./components/hot-rank"
 import { MarketWorkspace } from "./components/market"
 import { NewsWorkspace } from "./components/news"
 import { PortfolioWorkspace } from "./components/portfolio"
 import { TradeHistoryWorkspace } from "./components/trade-history"
+import { fetchHotRank, type HotRankFetcher } from "./eastmoney-hot-rank"
 import type { MarketDataSource } from "./market-data"
 import { type MarketOverviewDataSource, MarketOverviewService } from "./market-overview"
 import { PublicMarketOverviewDataSource } from "./market-overview-source"
@@ -59,6 +61,10 @@ export class MarketIntelligenceApp implements Component {
   #marketRefresh: Promise<void> | null = null
   readonly #newsSource: NewsDataSource
   #newsRefresh: Promise<void> | null = null
+  readonly #hotRank = new HotRankWorkspace()
+  readonly #hotRankSource: HotRankFetcher
+  #hotRankRefresh: Promise<void> | null = null
+  #marketPanel: "quotes" | "hotRank" = "quotes"
   readonly #agentScroll: AgentScrollState
   readonly #extensions: AgentExtensionRuntime
   readonly #input: AppInputHandler
@@ -78,11 +84,13 @@ export class MarketIntelligenceApp implements Component {
     marketOverviewSource: MarketOverviewDataSource = new PublicMarketOverviewDataSource(),
     extensionFactory: () => AgentExtensionRuntime = () => new AgentExtensionRuntime(),
     automation?: AutomationRuntime,
+    hotRankSource: HotRankFetcher = fetchHotRank,
   ) {
     this.#extensions = extensionFactory()
     this.#prompt = new CommandPrompt(() => this.#extensions.getCommands())
     this.#marketSource = marketSource
     this.#newsSource = newsSource
+    this.#hotRankSource = hotRankSource
     this.#trading = trading
     this.#market = new MarketWorkspace(watchlist.codes)
     this.#watchlist = new WatchlistCoordinator(
@@ -120,14 +128,19 @@ export class MarketIntelligenceApp implements Component {
       executeCommand: (input) =>
         executeCommand(input, this.#commandContext(), this.#extensions.getCommands()),
       promptAgent: (input) => void this.#agent.prompt(input),
-      refreshMarket: () => void this.refreshMarket(),
+      refreshMarket: () =>
+        this.#marketPanel === "hotRank" ? void this.refreshHotRank() : void this.refreshMarket(),
       refreshNews: () => void this.refreshNews(),
+      toggleMarketPanel: () => this.toggleMarketPanel(),
       handleNewsInput: (input) => {
         const handled = this.#news.handleInput(input)
         void this.#news.loadSelectedArticle().then(() => this.onUpdate())
         return handled
       },
-      handleMarketInput: (input) => this.#market.handleInput(input),
+      handleMarketInput: (input) =>
+        this.#marketPanel === "hotRank"
+          ? this.#hotRank.handleInput(input)
+          : this.#market.handleInput(input),
       handlePortfolioInput: (input) => this.#portfolio.handleInput(input),
       handleTradeInput: (input) => this.#tradeHistory.handleInput(input),
       onQuit: () => this.onQuit(),
@@ -180,6 +193,31 @@ export class MarketIntelligenceApp implements Component {
     return refresh
   }
 
+  /** 行情面板在自选股与人气榜之间切换；首次进入人气榜时懒加载 */
+  toggleMarketPanel(): void {
+    this.#marketPanel = this.#marketPanel === "hotRank" ? "quotes" : "hotRank"
+    if (this.#marketPanel === "hotRank" && this.#hotRank.status === "idle") {
+      void this.refreshHotRank()
+    }
+    this.onUpdate()
+  }
+
+  refreshHotRank(): Promise<void> {
+    if (this.#hotRankRefresh !== null) return this.#hotRankRefresh
+
+    this.#hotRank.beginRefresh()
+    this.onUpdate()
+    const refresh = this.#hotRankSource()
+      .then((snapshot) => this.#hotRank.applySnapshot(snapshot))
+      .catch(() => this.#hotRank.failRefresh())
+      .finally(() => {
+        this.#hotRankRefresh = null
+        this.onUpdate()
+      })
+    this.#hotRankRefresh = refresh
+    return refresh
+  }
+
   startAutoRefresh(): void {
     this.#autoRefresh.start()
     this.#automation.tasks.start()
@@ -217,6 +255,7 @@ export class MarketIntelligenceApp implements Component {
       marketOverview: this.#marketOverview,
       market: this.#market,
       news: this.#news,
+      hotRank: this.#hotRank,
       trading: this.#trading,
       watchlist: this.#watchlist,
       portfolio: this.#portfolio,
@@ -224,6 +263,7 @@ export class MarketIntelligenceApp implements Component {
       activeTab: () => this.#activeTab,
       refreshMarket: () => this.refreshMarket(),
       refreshNews: () => this.refreshNews(),
+      refreshHotRank: () => this.refreshHotRank(),
       quit: () => this.onQuit(),
     })
   }
@@ -249,7 +289,7 @@ export class MarketIntelligenceApp implements Component {
     return renderAppFrame(width, {
       activeTab: this.#activeTab,
       viewportRows: this.#agentScroll.viewportRows,
-      market: this.#market,
+      market: this.#marketPanel === "hotRank" ? this.#hotRank : this.#market,
       portfolio: this.#portfolio,
       news: this.#news,
       prompt: this.#prompt.view,

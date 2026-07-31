@@ -1,9 +1,12 @@
 import { expect, test } from "bun:test"
-import type { AgentModelSwitcher } from "../src/agent-controller"
+import type { AgentModelSwitcher, AgentThinkingControl } from "../src/agent-controller"
 import type { CommandContext, CommandResult } from "../src/commands"
 import { MODEL_COMMANDS } from "../src/model-commands"
 
-function contextWith(switcher: AgentModelSwitcher | undefined): CommandContext {
+function contextWith(
+  switcher: AgentModelSwitcher | undefined,
+  thinking?: AgentThinkingControl,
+): CommandContext {
   return {
     focus: () => {},
     refresh: () => ({ market: "skipped", news: "skipped" }),
@@ -30,12 +33,14 @@ function contextWith(switcher: AgentModelSwitcher | undefined): CommandContext {
     watchlist: () => [],
     changeWatchlist: async () => ({ ok: false, code: "", message: "未实现" }),
     agentModel: () => switcher,
+    agentThinking: () => thinking,
   }
 }
 
 function run(context: CommandContext, input: string): CommandResult {
-  const command = MODEL_COMMANDS[0]
-  if (command === undefined) throw new Error("模型命令未注册")
+  const name = input.split(/\s+/)[0]?.slice(1)
+  const command = MODEL_COMMANDS.find((candidate) => candidate.name === name)
+  if (command === undefined) throw new Error(`命令未注册：${input}`)
   const result = command.execute(context, input.split(/\s+/).slice(1))
   if (result instanceof Promise) throw new Error("预期同步命令")
   return result
@@ -74,4 +79,35 @@ test("/model 2 切换到第二个模型，无效目标报错", () => {
 
 test("模型不可用时给出提示", () => {
   expect(run(contextWith(undefined), "/model").lines).toEqual(["模型不可用或未配置"])
+})
+
+function thinkingControl(selected: string[]): AgentThinkingControl {
+  return {
+    current: () => (selected.length === 0 ? "default" : (selected.at(-1) ?? "default")),
+    list: () => ["default", "minimal", "low", "medium", "high", "xhigh", "max"],
+    select: (target) => {
+      if (target === "bad") throw new Error("无效思考等级：bad")
+      selected.push(target)
+      return target
+    },
+  }
+}
+
+test("/think 列出思考等级并标记当前", () => {
+  const result = run(contextWith(undefined, thinkingControl([])), "/think")
+  expect(result.title).toBe("思考等级")
+  expect(result.lines.join("\n")).toContain("default（当前）")
+  expect(result.lines.join("\n")).toContain("high")
+})
+
+test("/think high 调整思考等级，无效等级报错", () => {
+  const selected: string[] = []
+  const context = contextWith(undefined, thinkingControl(selected))
+  expect(run(context, "/think high").lines.join("\n")).toContain("已调整 → high")
+  expect(selected).toEqual(["high"])
+  expect(run(context, "/think bad").title).toBe("命令错误")
+})
+
+test("思考等级不可用时给出提示", () => {
+  expect(run(contextWith(undefined, undefined), "/think").lines).toEqual(["思考等级不可用或未配置"])
 })

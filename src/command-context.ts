@@ -1,7 +1,8 @@
-import type { AgentModelSwitcher } from "./agent-controller"
+import type { AgentModelSwitcher, AgentThinkingControl } from "./agent-controller"
 import type { AgentEventSink } from "./agent-event-dispatcher"
 import type { CommandExecution } from "./commands"
 import type { ConditionalOrderService } from "./conditional-order-service"
+import type { HotRankSnapshot } from "./eastmoney-hot-rank"
 import type { MarketSnapshot } from "./market-data"
 import type { MarketOverviewSnapshot } from "./market-overview"
 import type { MemoryService } from "./memory-service"
@@ -45,6 +46,7 @@ export interface CommandContext {
   status(): AppStatus
   marketSnapshot(): MarketSnapshot | null
   newsSnapshot(): FinancialNewsSnapshot | null
+  hotRank?(refresh?: boolean): Promise<HotRankSnapshot | null>
   portfolio(): PortfolioSnapshot
   quote(code: string): Promise<TradeQuote | undefined>
   quoteDetail?(code: string): Promise<StockDetail | undefined>
@@ -54,6 +56,7 @@ export interface CommandContext {
   changeWatchlist(action: "add" | "remove", code: string): Promise<WatchlistChange>
   systemEvents?(): AgentEventSink
   agentModel?(): AgentModelSwitcher | undefined
+  agentThinking?(): AgentThinkingControl | undefined
   conditionalOrders?(): ConditionalOrderService
   scheduledTasks?(): ScheduledTaskService
   memory?(): MemoryService

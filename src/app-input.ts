@@ -12,6 +12,7 @@ export interface AppInputOptions {
   readonly promptAgent: (input: string) => unknown
   readonly refreshMarket: () => unknown
   readonly refreshNews: () => unknown
+  readonly toggleMarketPanel: () => unknown
   readonly handleNewsInput: (data: string) => boolean
   readonly handleMarketInput: (data: string) => boolean
   readonly handlePortfolioInput: (data: string) => boolean
@@ -73,6 +74,10 @@ export class AppInputHandler {
     }
     if (options.activeTab() === NEWS && (data === "r" || data === "R")) {
       options.refreshNews()
+      return
+    }
+    if (options.activeTab() === MARKET && (data === "h" || data === "H")) {
+      options.toggleMarketPanel()
       return
     }
     if (data === "\t" || data === "\x1b[C") {

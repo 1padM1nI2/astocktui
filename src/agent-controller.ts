@@ -67,10 +67,17 @@ export interface AgentModelSwitcher {
   select(target: string): string
 }
 
+export interface AgentThinkingControl {
+  current(): string
+  list(): readonly string[]
+  select(target: string): string
+}
+
 export class AgentController {
   readonly #driver: AgentDriver
   readonly #modelLabel: string | (() => string)
   readonly modelSwitcher: AgentModelSwitcher | undefined
+  readonly thinkingControl: AgentThinkingControl | undefined
   readonly #configurationError: string | null
   readonly #listeners = new Set<() => void>()
   readonly #tools: MutableToolView[] = []
@@ -87,10 +94,12 @@ export class AgentController {
     configurationError?: string,
     history: readonly AgentExchangeView[] = [],
     modelSwitcher?: AgentModelSwitcher,
+    thinkingControl?: AgentThinkingControl,
   ) {
     this.#driver = driver
     this.#modelLabel = modelLabel
     this.modelSwitcher = modelSwitcher
+    this.thinkingControl = thinkingControl
     this.#configurationError = configurationError ?? null
     this.#status = configurationError === undefined ? "idle" : "unconfigured"
     this.#error = this.#configurationError

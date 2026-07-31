@@ -5,6 +5,7 @@ import { refreshAppData } from "./app-refresh"
 import { WORKSPACE_NAMES } from "./app-render"
 import type { AutomationRuntime } from "./automation-runtime"
 import type { CommandContext, RefreshReport, RefreshTarget, WorkspaceName } from "./commands"
+import type { HotRankWorkspace } from "./components/hot-rank"
 import type { MarketWorkspace } from "./components/market"
 import type { NewsWorkspace } from "./components/news"
 import type { PortfolioWorkspace } from "./components/portfolio"
@@ -24,6 +25,7 @@ export interface AppCommandContextDeps {
   readonly marketOverview: MarketOverviewService
   readonly market: MarketWorkspace
   readonly news: NewsWorkspace
+  readonly hotRank: HotRankWorkspace
   readonly trading: PaperTradingService
   readonly watchlist: WatchlistCoordinator
   readonly portfolio: PortfolioWorkspace
@@ -31,6 +33,7 @@ export interface AppCommandContextDeps {
   readonly activeTab: () => number
   readonly refreshMarket: () => Promise<void>
   readonly refreshNews: () => Promise<void>
+  readonly refreshHotRank: () => Promise<void>
   readonly quit: () => void
 }
 
@@ -40,6 +43,7 @@ export function buildCommandContext(deps: AppCommandContextDeps): CommandContext
     refresh: deps.refresh,
     systemEvents: () => deps.dispatcher(),
     agentModel: () => deps.agent().modelSwitcher,
+    agentThinking: () => deps.agent().thinkingControl,
     conditionalOrders: () => deps.automation().conditions,
     scheduledTasks: () => deps.automation().tasks,
     memory: () => deps.memory,
@@ -62,6 +66,10 @@ export function buildCommandContext(deps: AppCommandContextDeps): CommandContext
       refresh ? deps.marketOverview.refresh() : deps.marketOverview.getOverview(),
     marketSnapshot: () => deps.market.snapshot,
     newsSnapshot: () => deps.news.snapshot,
+    hotRank: async (refresh = false) => {
+      if (refresh || deps.hotRank.status === "idle") await deps.refreshHotRank()
+      return deps.hotRank.snapshot
+    },
     portfolio: () => deps.trading.snapshot,
     quote: (code) => deps.watchlist.resolveQuote(code),
     quoteDetail: async (code) => (await fetchTencentStockDetails([code])).get(code),

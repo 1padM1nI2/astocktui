@@ -4,6 +4,7 @@ export interface AgentSessionState {
   readonly version: 1
   readonly savedAt: string
   readonly messages: readonly unknown[]
+  readonly thinkingLevel?: string
 }
 
 export interface AgentSessionLoadResult {
@@ -44,11 +45,12 @@ export class AgentSessionStore {
     }
   }
 
-  save(messages: readonly unknown[]): void {
+  save(messages: readonly unknown[], extras?: { readonly thinkingLevel?: string }): void {
     writeJsonFileAtomically(this.path, {
       version: 1,
       savedAt: new Date().toISOString(),
       messages: capMessages(messages, this.#maxMessages),
+      ...(extras?.thinkingLevel === undefined ? {} : { thinkingLevel: extras.thinkingLevel }),
     })
   }
 }
