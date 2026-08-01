@@ -7,6 +7,7 @@ import { parseFallbackModelList, resolveModelChain } from "./agent-models"
 import { AgentSessionStore } from "./agent-session-store"
 import { createAStockAgentTools } from "./agent-tools"
 import type { CommandContext } from "./commands"
+import { createMcpAgentTools } from "./mcp-agent-tools"
 import { PiAgentDriver, SYSTEM_PROMPT } from "./pi-agent-driver"
 import { ToolCallLogger } from "./tool-call-log"
 
@@ -64,7 +65,10 @@ export function createPiAgentController(
   const configurationError =
     apiKeyName !== undefined && apiKey === undefined ? `未配置 ${apiKeyName}` : undefined
   const configuredApiKey = config.apiKey
-  const tools = createAStockAgentTools(context)
+  const tools = [
+    ...createAStockAgentTools(context),
+    ...(extensions === undefined ? [] : createMcpAgentTools(extensions)),
+  ]
   const toolCallLog = new ToolCallLogger()
   toolCallLog.recordEvent("agent_model_chain", {
     models: resolved.chain.map((option) => option.label),

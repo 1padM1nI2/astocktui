@@ -24,7 +24,7 @@ interface ConfigDocument {
   readonly value: Record<string, unknown>
 }
 
-const SERVER_NAME = /^[A-Za-z0-9_.-]{1,100}$/u
+export const SERVER_NAME = /^[A-Za-z0-9_.-]{1,100}$/u
 const DEFAULT_TIMEOUT = 30_000
 
 export async function loadMcpConfigs(options: McpConfigLoadOptions): Promise<McpConfigLoadResult> {
@@ -210,7 +210,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined
 }
 
-function isHttpUrl(value: string): boolean {
+export function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value)
     return url.protocol === "http:" || url.protocol === "https:"

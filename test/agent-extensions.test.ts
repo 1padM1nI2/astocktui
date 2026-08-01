@@ -1,9 +1,13 @@
 import { expect, test } from "bun:test"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
 import { AgentController, type AgentDriver, type AgentDriverEvent } from "../src/agent-controller"
 import type { McpServerConfig, McpServerStatus } from "../src/agent-extension-types"
 import { AgentExtensionRuntime, type McpManagerFactory } from "../src/agent-extensions"
 import { MarketIntelligenceApp } from "../src/app"
+import { loadMcpConfigs } from "../src/mcp/config"
 import type { McpServerConnection } from "../src/mcp/manager"
 import { type DiscoveredSkill, SkillRegistry } from "../src/skills"
 
@@ -136,3 +140,32 @@ function submit(app: MarketIntelligenceApp, input: string): void {
   for (const character of input) app.handleInput(character)
   app.handleInput("\r")
 }
+
+test("扩展运行时写入项目 mcp.json 并触发热更新", async () => {
+  const root = await mkdtemp(join(tmpdir(), "astock-mcp-ext-"))
+  try {
+    const manager = new FakeManager()
+    const runtime = new AgentExtensionRuntime({
+      cwd: root,
+      home: join(root, "home"),
+      discoverSkills: async () => new SkillRegistry([], []),
+      loadMcpConfigs: (options) => loadMcpConfigs(options),
+      managerFactory: () => manager,
+    })
+
+    await runtime.addMcpServer("quote", { type: "http", url: "https://mcp.example.com" })
+    const written = JSON.parse(await readFile(join(root, "mcp.json"), "utf8")) as {
+      mcpServers: Record<string, { url?: string }>
+    }
+    expect(written.mcpServers["quote"]?.url).toBe("https://mcp.example.com")
+    expect(manager.reloads?.map((server) => server.name)).toEqual(["quote"])
+
+    await runtime.removeMcpServer("quote")
+    expect(manager.reloads).toEqual([])
+    await expect(runtime.removeMcpServer("quote")).rejects.toThrow("不存在")
+    await expect(runtime.addMcpServer("bad name", { command: "x" })).rejects.toThrow("名称无效")
+    await runtime.dispose()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})

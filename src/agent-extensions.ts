@@ -1,7 +1,9 @@
+import { join } from "node:path"
 import type { AgentTool } from "@oh-my-pi/pi-agent-core"
 import type { ExtensionDiagnostic, McpServerConfig, McpServerStatus } from "./agent-extension-types"
 import type { AppCommand, CommandResult } from "./commands"
 import { loadMcpConfigs, type McpConfigLoadOptions, type McpConfigLoadResult } from "./mcp/config"
+import { type McpServerDefinition, removeMcpServer, upsertMcpServer } from "./mcp/config-writer"
 import { McpManager, type McpManagerOptions, type McpServerConnection } from "./mcp/manager"
 import { bridgeMcpTools } from "./mcp/tool-bridge"
 import { buildSkillPrompt, createSkillCommands, createSkillReadTool } from "./skill-tool"
@@ -92,6 +94,24 @@ export class AgentExtensionRuntime {
     }
   }
 
+  async addMcpServer(name: string, definition: McpServerDefinition): Promise<void> {
+    await this.initialize()
+    upsertMcpServer(this.#projectConfigPath(), name, definition)
+    await this.#reload()
+  }
+
+  async removeMcpServer(name: string): Promise<void> {
+    await this.initialize()
+    if (!removeMcpServer(this.#projectConfigPath(), name)) {
+      throw new Error(`MCP server 不存在：${name}`)
+    }
+    await this.#reload()
+  }
+
+  mcpStatuses(): readonly McpServerStatus[] {
+    return this.#manager?.getStatuses() ?? []
+  }
+
   async mcpCommand(args: readonly string[]): Promise<CommandResult> {
     await this.initialize()
     const action = args[0]?.toLowerCase() ?? "list"
@@ -151,6 +171,10 @@ export class AgentExtensionRuntime {
     const configs = await this.#loadConfigs(cwd, home)
     await this.#manager?.reload(configs)
     this.#notify()
+  }
+
+  #projectConfigPath(): string {
+    return join(this.#options.cwd ?? process.cwd(), "mcp.json")
   }
 
   async #loadConfigs(cwd: string, home: string): Promise<readonly McpServerConfig[]> {
