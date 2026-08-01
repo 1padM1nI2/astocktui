@@ -5,7 +5,7 @@ import {
   parseFallbackModelList,
   withAgentBaseUrl,
 } from "../src/agent-models"
-import { authorizeAgentTool, PiAgentDriver } from "../src/pi-agent-driver"
+import { authorizeAgentTool, FALLBACK_RETRY_MS, PiAgentDriver } from "../src/pi-agent-driver"
 
 test("Pi Agent 对任意分析文本均允许自主模拟交易", () => {
   for (const input of [
@@ -173,6 +173,93 @@ test("额度耗尽时切换到下一个模型并重试", async () => {
     to: "deepseek/m2",
     reason: "429 insufficient_quota: quota exceeded",
   })
+})
+
+test("额度回退超过重试间隔后，下次运行切回主模型", async () => {
+  const realNow = Date.now
+  let now = realNow()
+  Date.now = () => now
+  try {
+    const agent = new StubAgent("429 insufficient_quota: quota exceeded")
+    const labels: string[] = []
+    const debug: string[] = []
+    const driver = new PiAgentDriver(
+      agent as never,
+      [
+        { model: { id: "m1" } as never, label: "openai/m1" },
+        { model: { id: "m2" } as never, label: "deepseek/m2" },
+      ],
+      new Map(),
+      () => [],
+      undefined,
+      () => labels.push(driver.modelLabel),
+      (kind) => debug.push(kind),
+    )
+    await driver.run("分析一下", () => {})
+    expect(driver.modelLabel).toBe("deepseek/m2")
+    now += FALLBACK_RETRY_MS + 1
+    await driver.run("再看看", () => {})
+    expect(agent.model).toEqual({ id: "m1" })
+    expect(driver.modelLabel).toBe("openai/m1")
+    expect(labels).toEqual(["deepseek/m2", "openai/m1"])
+    expect(debug).toContain("agent_fallback_retry")
+  } finally {
+    Date.now = realNow
+  }
+})
+
+test("额度回退未到重试间隔时保持备用模型", async () => {
+  const realNow = Date.now
+  let now = realNow()
+  Date.now = () => now
+  try {
+    const agent = new StubAgent("429 insufficient_quota: quota exceeded")
+    const debug: string[] = []
+    const driver = new PiAgentDriver(
+      agent as never,
+      [
+        { model: { id: "m1" } as never, label: "openai/m1" },
+        { model: { id: "m2" } as never, label: "deepseek/m2" },
+      ],
+      new Map(),
+      () => [],
+      undefined,
+      undefined,
+      (kind) => debug.push(kind),
+    )
+    await driver.run("分析一下", () => {})
+    now += FALLBACK_RETRY_MS - 1
+    await driver.run("再看看", () => {})
+    expect(driver.modelLabel).toBe("deepseek/m2")
+    expect(debug).not.toContain("agent_fallback_retry")
+  } finally {
+    Date.now = realNow
+  }
+})
+
+test("手动切换模型后不再自动回切", async () => {
+  const realNow = Date.now
+  let now = realNow()
+  Date.now = () => now
+  try {
+    const agent = new StubAgent("429 insufficient_quota: quota exceeded")
+    const driver = new PiAgentDriver(
+      agent as never,
+      [
+        { model: { id: "m1" } as never, label: "openai/m1" },
+        { model: { id: "m2" } as never, label: "deepseek/m2" },
+      ],
+      new Map(),
+      () => [],
+    )
+    await driver.run("分析一下", () => {})
+    driver.selectModel("deepseek/m2")
+    now += FALLBACK_RETRY_MS + 1
+    await driver.run("再看看", () => {})
+    expect(driver.modelLabel).toBe("deepseek/m2")
+  } finally {
+    Date.now = realNow
+  }
 })
 
 test("非额度错误不切换模型，且错误抛出给控制器", async () => {

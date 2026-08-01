@@ -26,6 +26,9 @@ import { summarizeToolResult } from "./tool-result-summary"
 
 export { authorizeAgentTool, SYSTEM_PROMPT }
 
+/** 额度回退后重新尝试主模型的间隔（额度通常按数小时窗口重置） */
+export const FALLBACK_RETRY_MS = 60 * 60 * 1000
+
 export class PiAgentDriver implements AgentDriver {
   readonly #agent: Agent
   #models: readonly AgentModelOption[]
@@ -37,6 +40,8 @@ export class PiAgentDriver implements AgentDriver {
   readonly #contextSummarizer: ConversationSummarizer | undefined
   #extensionSupplement: readonly string[] = []
   #modelIndex = 0
+  /** 额度耗尽触发回退的时间戳；手动切换模型会清除 */
+  #quotaFellBackAt: number | null = null
   #thinkingLevel: ThinkingLevelName = DEFAULT_THINKING_LEVEL
   #emit: ((event: AgentDriverEvent) => void) | null = null
   #currentInput = ""
@@ -117,6 +122,8 @@ export class PiAgentDriver implements AgentDriver {
       this.#models = [...this.#models, option]
       index = this.#models.length - 1
     }
+    // 手动选择生效即视为用户接管，取消额度回退的自动回切
+    this.#quotaFellBackAt = null
     if (index === this.#modelIndex) return this.modelLabel
     this.#modelIndex = index
     const option = this.#models[index]
@@ -153,6 +160,7 @@ export class PiAgentDriver implements AgentDriver {
   async run(input: string, emit: (event: AgentDriverEvent) => void): Promise<void> {
     this.#emit = emit
     this.#currentInput = input
+    this.#maybeRevertToPrimary()
     this.#agent.setSystemPrompt(this.#composePrompt())
     try {
       let base = this.#agent.state.messages.length
@@ -182,6 +190,23 @@ export class PiAgentDriver implements AgentDriver {
     }
   }
 
+  /** 回退满一个重试间隔后，在下一次运行时切回主模型；若仍限流会再次自动回退 */
+  #maybeRevertToPrimary(): void {
+    if (this.#quotaFellBackAt === null) return
+    if (this.#modelIndex === 0) {
+      this.#quotaFellBackAt = null
+      return
+    }
+    if (Date.now() - this.#quotaFellBackAt < FALLBACK_RETRY_MS) return
+    this.#quotaFellBackAt = null
+    this.#modelIndex = 0
+    const primary = this.#models[0]
+    if (primary === undefined) return
+    this.#agent.setModel(primary.model)
+    this.#onDebug?.("agent_fallback_retry", { to: primary.label })
+    this.#onModelChange?.()
+  }
+
   #advanceAfterQuotaFailure(base: number): boolean {
     const assistants = appendedAssistantOutcomes(this.#agent.state.messages, base)
     if (!exclusivelyFailed(assistants)) return false
@@ -193,6 +218,7 @@ export class PiAgentDriver implements AgentDriver {
     const reason = assistants.find((message) => message.stopReason === "error")?.errorMessage
     this.#agent.replaceMessages(this.#agent.state.messages.slice(0, base + 1))
     this.#modelIndex++
+    this.#quotaFellBackAt = Date.now()
     const next = this.#models[this.#modelIndex]
     if (next === undefined) return false
     const from = this.#models[this.#modelIndex - 1]?.label ?? ""
