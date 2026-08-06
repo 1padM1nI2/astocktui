@@ -4,6 +4,7 @@ import type { CommandContext, RefreshTarget, WorkspaceName } from "./commands"
 import { createConditionAgentTools } from "./condition-agent-tools"
 import { createFileAgentTools } from "./file-agent-tools"
 import { createMemoryAgentTools } from "./memory-agent-tools"
+import { createStockAgentTools } from "./stock-agent-tools"
 import { createScheduledTaskAgentTools } from "./task-agent-tools"
 import type { OrderQuantity, TradeQuote, TradeSide } from "./trading"
 
@@ -276,5 +277,6 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
     ...createConditionAgentTools(context),
     ...createScheduledTaskAgentTools(context),
     ...createMemoryAgentTools(context),
+    ...createStockAgentTools(context),
   ]
 }

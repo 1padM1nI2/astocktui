@@ -12,6 +12,7 @@ import type { PortfolioWorkspace } from "./components/portfolio"
 import type { MarketOverviewService } from "./market-overview"
 import type { MemoryService } from "./memory-service"
 import { fetchTencentStockDetails } from "./stock-detail"
+import { createEastmoneyStockSearcher } from "./stock-search"
 import type { PaperTradingService } from "./trading"
 import type { WatchlistCoordinator } from "./watchlist-coordinator"
 
@@ -36,6 +37,8 @@ export interface AppCommandContextDeps {
   readonly refreshHotRank: () => Promise<void>
   readonly quit: () => void
 }
+
+const searchAshareStocks = createEastmoneyStockSearcher()
 
 export function buildCommandContext(deps: AppCommandContextDeps): CommandContext {
   return {
@@ -73,6 +76,7 @@ export function buildCommandContext(deps: AppCommandContextDeps): CommandContext
     portfolio: () => deps.trading.snapshot,
     quote: (code) => deps.watchlist.resolveQuote(code),
     quoteDetail: async (code) => (await fetchTencentStockDetails([code])).get(code),
+    searchStocks: (query) => searchAshareStocks(query),
     trading: () => deps.trading,
     portfolioChanged: () => {
       deps.portfolio.applySnapshot(deps.trading.snapshot)

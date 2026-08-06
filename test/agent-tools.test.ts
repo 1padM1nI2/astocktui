@@ -199,6 +199,8 @@ describe("AStock Pi Agent 工具", () => {
       "list_memories",
       "forget_memory",
       "replace_memories",
+      "search_stock",
+      "get_stock_detail",
     ])
   })
 

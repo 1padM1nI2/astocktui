@@ -10,6 +10,7 @@ import type { FinancialNewsSnapshot } from "./news-data"
 import type { PortfolioSnapshot } from "./portfolio"
 import type { ScheduledTaskService } from "./scheduled-task-service"
 import type { StockDetail } from "./stock-detail"
+import type { StockSearchMatch } from "./stock-search"
 import type { PaperTradingService, TradeQuote } from "./trading"
 import type { WatchlistChange } from "./watchlist"
 
@@ -50,6 +51,7 @@ export interface CommandContext {
   portfolio(): PortfolioSnapshot
   quote(code: string): Promise<TradeQuote | undefined>
   quoteDetail?(code: string): Promise<StockDetail | undefined>
+  searchStocks?(query: string): Promise<readonly StockSearchMatch[]>
   trading(): PaperTradingService
   portfolioChanged(): void
   watchlist(): readonly string[]
