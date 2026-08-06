@@ -18,6 +18,7 @@ const parameters = z.object({
   name: z.string().min(1).optional(),
   prompt: z.string().min(1).optional(),
   schedule: scheduleSchema.optional(),
+  mode: z.enum(["agent", "research"]).optional(),
 })
 
 type TaskToolSchedule = {
@@ -34,6 +35,7 @@ type TaskToolInput = {
   readonly name?: string
   readonly prompt?: string
   readonly schedule?: TaskToolSchedule
+  readonly mode?: "agent" | "research"
 }
 
 function result(value: unknown): AgentToolResult<unknown> {
@@ -62,6 +64,7 @@ function taskInput(input: TaskToolInput): ScheduledTaskInput {
     name: input.name,
     prompt: input.prompt,
     schedule: normalizeSchedule(input.schedule),
+    ...(input.mode === undefined ? {} : { mode: input.mode }),
   }
 }
 
@@ -76,7 +79,7 @@ export function createScheduledTaskAgentTools(context: CommandContext): readonly
       name: "manage_scheduled_task",
       label: "管理定时任务",
       description:
-        "创建、查看、更新、暂停、恢复、删除或立即运行本地 Agent 定时任务。schedule 是扁平对象:kind 取 once/daily/interval;once 需填 at(未来 ISO 时间);daily 需填 time(HH:mm 上海时间,weekdaysOnly 可省略);interval 需填 minutes(1-1440 整数)。",
+        "创建、查看、更新、暂停、恢复、删除或立即运行本地 Agent 定时任务。schedule 是扁平对象:kind 取 once/daily/interval;once 需填 at(未来 ISO 时间);daily 需填 time(HH:mm 上海时间,weekdaysOnly 可省略);interval 需填 minutes(1-1440 整数)。mode 可省略,默认 agent(主对话执行);research 表示由只读调研子任务生成复盘报告并回流摘要。",
       parameters,
       intent: "omit",
       approval: "write",
@@ -84,7 +87,10 @@ export function createScheduledTaskAgentTools(context: CommandContext): readonly
         const input = params as TaskToolInput
         const tasks = service()
         if (input.action === "list")
-          return result({ total: tasks.list().length, tasks: tasks.list() })
+          return result({
+            total: tasks.list().length,
+            tasks: tasks.list().map((task) => ({ ...task, mode: task.mode ?? "agent" })),
+          })
         if (input.action === "create") return result(tasks.create(taskInput(input), "agent"))
         const id = input.id
         if (id === undefined) throw new Error("操作定时任务必须提供 id")

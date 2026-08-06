@@ -85,3 +85,52 @@ export function resolveModelChain(options: {
   }
   return { chain, error: null }
 }
+
+/** 额度回退后重新尝试主模型的间隔（额度通常按数小时窗口重置） */
+export const FALLBACK_RETRY_MS = 60 * 60 * 1000
+
+/** 回切决策：clear 表示应清除回退标记；primary 非空表示间隔已满，应切回该主模型 */
+export interface PrimaryRevert {
+  readonly clear: boolean
+  readonly primary: AgentModelOption | undefined
+}
+
+export function decidePrimaryRevert(
+  modelIndex: number,
+  quotaFellBackAt: number | null,
+  models: readonly AgentModelOption[],
+): PrimaryRevert {
+  if (quotaFellBackAt === null) return { clear: false, primary: undefined }
+  if (modelIndex === 0) return { clear: true, primary: undefined }
+  if (Date.now() - quotaFellBackAt < FALLBACK_RETRY_MS) return { clear: false, primary: undefined }
+  return { clear: true, primary: models[0] }
+}
+
+export type ModelTargetResolution =
+  | { readonly index: number; readonly models: readonly AgentModelOption[] }
+  | { readonly error: string }
+
+/** 把用户输入（序号 / 标签 / 链外 provider/model）解析为模型链中的下标，链外模型追加进链 */
+export function resolveModelTarget(
+  models: readonly AgentModelOption[],
+  target: string,
+): ModelTargetResolution {
+  const ordinal = Number(target)
+  const index =
+    Number.isInteger(ordinal) && ordinal >= 1
+      ? ordinal - 1
+      : models.findIndex((option) => option.label === target)
+  if (index >= 0 && index < models.length) return { index, models }
+  const spec = parseFallbackModelList(target)[0]
+  if (spec === undefined) return { error: `无效模型：${target}` }
+  const resolved = resolveModelChain({
+    provider: spec.provider,
+    modelId: spec.model,
+    fallbackSpecs: [],
+  })
+  const option = resolved.chain[0]
+  if (resolved.error !== null || option === undefined) {
+    return { error: resolved.error ?? `模型不存在：${target}` }
+  }
+  return { index: models.length, models: [...models, option] }
+}

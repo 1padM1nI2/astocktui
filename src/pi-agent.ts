@@ -3,7 +3,7 @@ import { getEnvApiKey, getEnvApiKeyName } from "@oh-my-pi/pi-ai"
 import { AgentController, type AgentDriver } from "./agent-controller"
 import type { AgentExtensionRuntime } from "./agent-extensions"
 import { messagesToExchanges } from "./agent-history"
-import { parseFallbackModelList, resolveModelChain } from "./agent-models"
+import { type AgentModelOption, parseFallbackModelList, resolveModelChain } from "./agent-models"
 import { AgentSessionStore } from "./agent-session-store"
 import { createAStockAgentTools } from "./agent-tools"
 import type { CommandContext } from "./commands"
@@ -28,14 +28,20 @@ class UnavailableAgentDriver implements AgentDriver {
   abort(): void {}
 }
 
-export function createPiAgentController(
-  context: CommandContext,
-  config: PiAgentConfig = {},
-  extensions?: AgentExtensionRuntime,
-): AgentController {
+/** 模型链解析结果，主 agent 与只读调研子任务共用 */
+export interface AgentModelChainResolution {
+  readonly modelLabel: string
+  readonly chain: readonly AgentModelOption[]
+  readonly error: string | null
+  readonly apiKey: string | undefined
+  readonly configuredApiKey: string | undefined
+  readonly configurationError: string | undefined
+}
+
+/** env（ASTOCK_AGENT_*）与显式配置合并后解析模型链和 API Key，行为与主 agent 一致 */
+export function resolveAgentModelChain(config: PiAgentConfig = {}): AgentModelChainResolution {
   const provider = config.provider ?? configuredValue("ASTOCK_AGENT_PROVIDER") ?? "openai"
   const modelId = config.model ?? configuredValue("ASTOCK_AGENT_MODEL") ?? "gpt-4o-mini"
-  const modelLabel = `${provider}/${modelId}`
   const configuredBaseUrl =
     config.baseUrl ??
     configuredValue("ASTOCK_AGENT_BASE_URL") ??
@@ -50,28 +56,39 @@ export function createPiAgentController(
     baseUrl: configuredBaseUrl,
     fallbackSpecs,
   })
-  if (resolved.error !== null || resolved.chain.length === 0)
-    return new AgentController(
-      new UnavailableAgentDriver(),
-      modelLabel,
-      resolved.error ?? undefined,
-    )
-  const primary = resolved.chain[0]
+  const apiKey = config.apiKey ?? getEnvApiKey(provider)
+  const apiKeyName = getEnvApiKeyName(provider)
+  return {
+    modelLabel: `${provider}/${modelId}`,
+    chain: resolved.chain,
+    error: resolved.error,
+    apiKey,
+    configuredApiKey: config.apiKey,
+    configurationError:
+      apiKeyName !== undefined && apiKey === undefined ? `未配置 ${apiKeyName}` : undefined,
+  }
+}
+
+export function createPiAgentController(
+  context: CommandContext,
+  config: PiAgentConfig = {},
+  extensions?: AgentExtensionRuntime,
+): AgentController {
+  const { modelLabel, chain, error, apiKey, configuredApiKey, configurationError } =
+    resolveAgentModelChain(config)
+  if (error !== null || chain.length === 0)
+    return new AgentController(new UnavailableAgentDriver(), modelLabel, error ?? undefined)
+  const primary = chain[0]
   if (primary === undefined)
     return new AgentController(new UnavailableAgentDriver(), modelLabel, "模型链为空")
 
-  const apiKey = config.apiKey ?? getEnvApiKey(provider)
-  const apiKeyName = getEnvApiKeyName(provider)
-  const configurationError =
-    apiKeyName !== undefined && apiKey === undefined ? `未配置 ${apiKeyName}` : undefined
-  const configuredApiKey = config.apiKey
   const tools = [
     ...createAStockAgentTools(context),
     ...(extensions === undefined ? [] : createMcpAgentTools(extensions)),
   ]
   const toolCallLog = new ToolCallLogger()
   toolCallLog.recordEvent("agent_model_chain", {
-    models: resolved.chain.map((option) => option.label),
+    models: chain.map((option) => option.label),
     apiKeyConfigured: apiKey !== undefined,
     configurationError: configurationError ?? "none",
   })
@@ -106,7 +123,7 @@ export function createPiAgentController(
   })
   const driver: PiAgentDriver = new PiAgentDriver(
     agent,
-    resolved.chain,
+    chain,
     new Map(tools.map((tool) => [tool.name, tool.label])),
     () => context.memory?.().promptSupplement() ?? [],
     sessionStore,

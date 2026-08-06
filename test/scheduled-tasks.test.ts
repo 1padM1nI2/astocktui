@@ -35,6 +35,24 @@ describe("定时任务规则", () => {
     ).toMatchObject({ ok: false })
   })
 
+  test("任务模式缺省为 agent，非法模式被拒绝", () => {
+    const now = at("2026-07-20T00:00:00.000Z")
+    const defaulted = validateScheduledTaskInput(schedule({ kind: "interval", minutes: 5 }), now)
+    expect(defaulted).toMatchObject({ ok: true, value: { mode: "agent" } })
+    expect(
+      validateScheduledTaskInput(
+        { ...schedule({ kind: "interval", minutes: 5 }), mode: "research" },
+        now,
+      ),
+    ).toMatchObject({ ok: true, value: { mode: "research" } })
+    expect(
+      validateScheduledTaskInput(
+        { ...schedule({ kind: "interval", minutes: 5 }), mode: "banana" as never },
+        now,
+      ),
+    ).toMatchObject({ ok: false })
+  })
+
   test("计算一次性、每日和工作日每日任务的唯一下一次运行时间", () => {
     const now = at("2026-07-17T01:00:00.000Z") // 周五 09:00（上海）
     expect(nextScheduledRunAt({ kind: "once", at: "2026-07-17T02:00:00.000Z" }, now)).toBe(

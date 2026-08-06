@@ -16,22 +16,14 @@ export function appendedAssistantOutcomes(
     .filter((message) => message.role === "assistant") as readonly AssistantOutcome[]
 }
 
-export function exclusivelyFailed(outcomes: readonly AssistantOutcome[]): boolean {
-  return (
-    outcomes.length > 0 &&
-    outcomes.every((message) => message.stopReason === "error" || message.stopReason === "aborted")
-  )
-}
-
+/**
+ * 本轮是否以上下文超限错误收尾。只需最后一条 assistant 消息是超限错误：
+ * 多步回合（工具调用中途）前面可能有成功步骤，若要求全部失败会漏判，
+ * 导致超限后静默断掉、要等用户手动发消息才触发压缩。
+ */
 export function isContextOverflowFailure(messages: readonly AgentMessage[], base: number): boolean {
-  const outcomes = appendedAssistantOutcomes(messages, base)
-  return (
-    exclusivelyFailed(outcomes) &&
-    outcomes.some(
-      (message) =>
-        message.stopReason === "error" && isContextOverflowError(message.errorMessage ?? ""),
-    )
-  )
+  const last = appendedAssistantOutcomes(messages, base).at(-1)
+  return last?.stopReason === "error" && isContextOverflowError(last.errorMessage ?? "")
 }
 
 export type ConversationSummarizer = (messages: readonly AgentMessage[]) => Promise<string>
@@ -43,6 +35,73 @@ export function endedOnLengthTruncation(messages: readonly AgentMessage[], base:
 
 /** 截断续写次数上限：最多续写 3 次，避免模型失控无限生成 */
 export const MAX_LENGTH_CONTINUATIONS = 3
+
+/** 正文伪工具调用的纠正重试上限：防止模型持续输出 XML 标记导致死循环 */
+export const MAX_TEXT_TOOLCALL_RETRIES = 2
+
+const TEXT_TOOL_CALL_PATTERN = /<\s*(?:function_calls|invoke\s+name=)/
+
+/**
+ * 本轮最后一条 assistant 消息是否把工具调用退化成了正文 XML 标记。
+ * 部分 provider/备用模型原生 function calling 不稳时会输出 <function_calls> 文本，
+ * 这种"假调用"不会真正执行，会让对话在工具调用处中断。
+ */
+export function endedOnTextToolCall(messages: readonly AgentMessage[], base: number): boolean {
+  const last = messages
+    .slice(base)
+    .filter((message) => message.role === "assistant")
+    .at(-1)
+  if (last === undefined) return false
+  const stopReason = (last as AssistantOutcome).stopReason
+  if (stopReason === "error" || stopReason === "aborted") return false
+  return TEXT_TOOL_CALL_PATTERN.test(messageText(last))
+}
+
+function messageText(message: AgentMessage): string {
+  const content = (message as { content?: unknown }).content
+  if (!Array.isArray(content)) return ""
+  return content
+    .map((part) => {
+      const text = (part as { text?: unknown }).text
+      return typeof text === "string" ? text : ""
+    })
+    .join("\n")
+}
+
+function textToolCallCorrectionMessage(): AgentMessage {
+  return {
+    role: "user",
+    content: [
+      {
+        type: "text",
+        text: "[系统] 你刚才把工具调用写成了正文里的 XML 标记（如 <function_calls>），这不会真正执行。请改用原生工具调用接口重新发起刚才的调用。",
+      },
+    ],
+    timestamp: Date.now(),
+  } as AgentMessage
+}
+
+/**
+ * 正文伪工具调用的恢复：移除伪调用消息、追加纠正指令后让模型重试。
+ * 达到上限仍输出标记则放弃，把原文留给用户可见。
+ */
+export async function recoverTextToolCallTurn(options: {
+  readonly agent: Agent
+  readonly base: number
+  readonly advanceAfterQuotaFailure: (base: number) => boolean
+  readonly onDebug: ((kind: string, fields: Record<string, unknown>) => void) | undefined
+}): Promise<void> {
+  const { agent, base, advanceAfterQuotaFailure, onDebug } = options
+  let attempts = 0
+  while (endedOnTextToolCall(agent.state.messages, base) && attempts < MAX_TEXT_TOOLCALL_RETRIES) {
+    if (agent.state.messages.at(-1)?.role !== "assistant") return
+    attempts++
+    onDebug?.("agent_text_toolcall_retry", { attempt: attempts })
+    agent.replaceMessages([...agent.state.messages.slice(0, -1), textToolCallCorrectionMessage()])
+    await agent.continue()
+    while (advanceAfterQuotaFailure(base)) await agent.continue()
+  }
+}
 
 export interface TurnRecoveryOptions {
   readonly agent: Agent

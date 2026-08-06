@@ -44,6 +44,27 @@ test("定时任务存储原子保存并恢复版本化状态", () => {
   }
 })
 
+test("任务模式随状态持久化往返，旧文件缺少模式字段仍可加载", () => {
+  const temporary = fixture()
+  try {
+    const withMode: ScheduledTaskState = {
+      ...state,
+      tasks: state.tasks.map((task) => ({ ...task, mode: "research" as const })),
+    }
+    const store = new ScheduledTaskStore(temporary.path)
+    store.save(withMode)
+    expect(store.load()).toEqual({ state: withMode, diagnostic: null })
+
+    writeFileSync(temporary.path, JSON.stringify(state), "utf8")
+    const legacy = store.load()
+    expect(legacy.diagnostic).toBeNull()
+    expect(legacy.state.tasks[0]).toMatchObject({ id: "TASK-0001" })
+    expect(legacy.state.tasks[0]?.mode).toBeUndefined()
+  } finally {
+    rmSync(temporary.directory, { recursive: true, force: true })
+  }
+})
+
 test("损坏或不兼容文件安全降级且不覆盖原内容", () => {
   const temporary = fixture()
   try {

@@ -1,11 +1,44 @@
 import { expect, test } from "bun:test"
+import { MAX_TEXT_TOOLCALL_RETRIES } from "../src/agent-context-recovery"
 import {
+  FALLBACK_RETRY_MS,
   isContextOverflowError,
   isQuotaExhaustedError,
   parseFallbackModelList,
   withAgentBaseUrl,
 } from "../src/agent-models"
-import { authorizeAgentTool, FALLBACK_RETRY_MS, PiAgentDriver } from "../src/pi-agent-driver"
+import { resolveAgentModelChain } from "../src/pi-agent"
+import { authorizeAgentTool, PiAgentDriver } from "../src/pi-agent-driver"
+
+test("模型链解析共用入口解析主模型、备用链与密钥配置", () => {
+  const resolved = resolveAgentModelChain({
+    provider: "openai",
+    model: "gpt-4o-mini",
+    apiKey: "sk-test",
+    baseUrl: "https://gateway.example.com/v1/",
+    fallbackModels: ["openai/gpt-4o"],
+  })
+  expect(resolved.error).toBeNull()
+  expect(resolved.modelLabel).toBe("openai/gpt-4o-mini")
+  expect(resolved.chain.map((option) => option.label)).toEqual([
+    "openai/gpt-4o-mini",
+    "openai/gpt-4o",
+  ])
+  expect(resolved.chain[0]?.model.baseUrl).toBe("https://gateway.example.com/v1")
+  expect(resolved.apiKey).toBe("sk-test")
+  expect(resolved.configuredApiKey).toBe("sk-test")
+  expect(resolved.configurationError).toBeUndefined()
+})
+
+test("模型链解析共用入口对未知模型返回错误且链为空", () => {
+  const resolved = resolveAgentModelChain({
+    provider: "openai",
+    model: "no-such-model",
+    apiKey: "sk-test",
+  })
+  expect(resolved.chain).toEqual([])
+  expect(resolved.error).toContain("no-such-model")
+})
 
 test("Pi Agent 对任意分析文本均允许自主模拟交易", () => {
   for (const input of [
@@ -260,6 +293,195 @@ test("手动切换模型后不再自动回切", async () => {
   } finally {
     Date.now = realNow
   }
+})
+
+test("模型把工具调用写成正文标记时自动移除并纠正重试", async () => {
+  class TextToolCallAgent extends StubAgent {
+    override async prompt(_input: string): Promise<void> {
+      this.state.messages.push({ role: "user" })
+      this.state.messages.push({
+        role: "assistant",
+        stopReason: "stop",
+        content: [
+          { type: "text", text: '先看大盘 <function_calls><invoke name="get_market_overview">' },
+        ],
+      } as never)
+    }
+    override async continue(): Promise<void> {
+      this.continued++
+      this.state.messages.push({
+        role: "assistant",
+        stopReason: "stop",
+        content: [{ type: "text", text: "好的，改用原生工具调用。" }],
+      } as never)
+    }
+  }
+  const agent = new TextToolCallAgent(null)
+  const debug: string[] = []
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+    undefined,
+    undefined,
+    (kind) => debug.push(kind),
+  )
+  await driver.run("分析一下", () => {})
+  expect(agent.continued).toBe(1)
+  expect(debug).toContain("agent_text_toolcall_retry")
+  const assistantTexts = agent.state.messages
+    .filter((message) => message.role === "assistant")
+    .flatMap((message) =>
+      ((message as { content?: { text?: string }[] }).content ?? []).map((part) => part.text ?? ""),
+    )
+  expect(assistantTexts.some((text) => text.includes("function_calls"))).toBe(false)
+  expect(assistantTexts.at(-1)).toBe("好的，改用原生工具调用。")
+})
+
+test("正文伪工具调用纠正达到上限后停止重试", async () => {
+  class AlwaysTextToolCallAgent extends StubAgent {
+    override async prompt(_input: string): Promise<void> {
+      this.state.messages.push({ role: "user" })
+      this.#fakeToolCall()
+    }
+    override async continue(): Promise<void> {
+      this.continued++
+      this.#fakeToolCall()
+    }
+    #fakeToolCall(): void {
+      this.state.messages.push({
+        role: "assistant",
+        stopReason: "stop",
+        content: [{ type: "text", text: '<function_calls><invoke name="get_market_overview">' }],
+      } as never)
+    }
+  }
+  const agent = new AlwaysTextToolCallAgent(null)
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+  )
+  await driver.run("分析一下", () => {})
+  expect(agent.continued).toBe(MAX_TEXT_TOOLCALL_RETRIES)
+})
+
+test("工具调用中途撞上上下文超限时立即压缩重试，而不是静默断掉", async () => {
+  class MidTurnOverflowAgent extends StubAgent {
+    override async prompt(_input: string): Promise<void> {
+      this.state.messages.push({ role: "user" })
+      // 多步回合：前一步成功，下一步才撞上上下文超限
+      this.state.messages.push({ role: "assistant", stopReason: "stop" })
+      this.state.messages.push({
+        role: "assistant",
+        stopReason: "error",
+        errorMessage: "400 invalid params, context window exceeds limit (2013)",
+      })
+    }
+    override async continue(): Promise<void> {
+      this.continued++
+      this.state.messages.push({ role: "assistant", stopReason: "stop" })
+    }
+  }
+  const agent = new MidTurnOverflowAgent(null)
+  agent.state.messages.push(
+    { role: "user" },
+    { role: "assistant", stopReason: "stop" },
+    { role: "user" },
+    { role: "assistant", stopReason: "stop" },
+  )
+  const debug: string[] = []
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+    undefined,
+    undefined,
+    (kind) => debug.push(kind),
+  )
+  await driver.run("分析一下", () => {})
+  expect(agent.continued).toBe(1)
+  expect(debug).toContain("agent_context_trim")
+  expect(agent.state.messages.map((message) => message.role)).toEqual(["user", "assistant"])
+  expect(agent.state.messages.at(-1)?.stopReason).toBe("stop")
+})
+
+test("工具调用中途额度耗尽时立即切换备用模型重试", async () => {
+  class MidTurnQuotaAgent extends StubAgent {
+    override async prompt(_input: string): Promise<void> {
+      this.state.messages.push({ role: "user" })
+      this.state.messages.push({ role: "assistant", stopReason: "stop" })
+      this.state.messages.push({
+        role: "assistant",
+        stopReason: "error",
+        errorMessage: "429 insufficient_quota: quota exceeded",
+      })
+    }
+    override async continue(): Promise<void> {
+      this.continued++
+      this.state.messages.push({ role: "assistant", stopReason: "stop" })
+    }
+  }
+  const agent = new MidTurnQuotaAgent(null)
+  const labels: string[] = []
+  const debug: string[] = []
+  const driver = new PiAgentDriver(
+    agent as never,
+    [
+      { model: { id: "m1" } as never, label: "openai/m1" },
+      { model: { id: "m2" } as never, label: "deepseek/m2" },
+    ],
+    new Map(),
+    () => [],
+    undefined,
+    () => labels.push(driver.modelLabel),
+    (kind) => debug.push(kind),
+  )
+  await driver.run("分析一下", () => {})
+  expect(agent.continued).toBe(1)
+  expect(agent.model).toEqual({ id: "m2" })
+  expect(labels).toEqual(["deepseek/m2"])
+  expect(debug).toContain("agent_fallback")
+  expect(agent.state.messages.map((message) => message.role)).toEqual(["user", "assistant"])
+  expect(agent.state.messages.at(-1)?.stopReason).toBe("stop")
+})
+
+test("工具调用中途备用模型也耗尽时抛出错误而不是静默断掉", async () => {
+  class MidTurnAlwaysQuotaAgent extends StubAgent {
+    override async prompt(_input: string): Promise<void> {
+      this.state.messages.push({ role: "user" })
+      this.state.messages.push({ role: "assistant", stopReason: "stop" })
+      this.#quotaError()
+    }
+    override async continue(): Promise<void> {
+      this.continued++
+      this.#quotaError()
+    }
+    #quotaError(): void {
+      this.state.messages.push({
+        role: "assistant",
+        stopReason: "error",
+        errorMessage: "429 insufficient_quota: quota exceeded",
+      })
+    }
+  }
+  const agent = new MidTurnAlwaysQuotaAgent(null)
+  const driver = new PiAgentDriver(
+    agent as never,
+    [
+      { model: { id: "m1" } as never, label: "openai/m1" },
+      { model: { id: "m2" } as never, label: "deepseek/m2" },
+    ],
+    new Map(),
+    () => [],
+  )
+  await expect(driver.run("分析一下", () => {})).rejects.toThrow(
+    "429 insufficient_quota: quota exceeded",
+  )
+  expect(agent.continued).toBe(1)
 })
 
 test("非额度错误不切换模型，且错误抛出给控制器", async () => {

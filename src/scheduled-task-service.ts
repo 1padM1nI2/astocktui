@@ -5,6 +5,7 @@ import {
   nextScheduledRunAt,
   type ScheduledTask,
   type ScheduledTaskInput,
+  type ScheduledTaskMode,
   type ScheduledTaskSource,
   validateScheduledTaskInput,
 } from "./scheduled-tasks"
@@ -17,6 +18,7 @@ export interface ScheduledTaskEvent {
   readonly createdAt: string
   readonly taskId: string
   readonly taskName: string
+  readonly mode: ScheduledTaskMode
   readonly source: ScheduledTaskSource
 }
 
@@ -148,6 +150,22 @@ export class ScheduledTaskService {
     return this.#enqueue(this.#task(id), this.#now())
   }
 
+  /** 由执行方（如调研子任务路由）回写真实完成状态；lastRun 时间保留入队时刻 */
+  markRunResult(id: string, state: "completed" | "failed", reason?: string): ScheduledTask {
+    const task = this.#task(id)
+    const updated: ScheduledTask = {
+      ...task,
+      lastRun: {
+        at: task.lastRun?.at ?? this.#now().toISOString(),
+        state,
+        ...(reason === undefined ? {} : { reason }),
+      },
+    }
+    this.#replace(updated)
+    this.#save()
+    return updated
+  }
+
   tick(now: Date = this.#now()): void {
     for (const task of this.#state.tasks) {
       if (
@@ -200,6 +218,7 @@ export class ScheduledTaskService {
       createdAt: now.toISOString(),
       taskId: task.id,
       taskName: task.name,
+      mode: task.mode ?? "agent",
       source: task.updatedBy ?? task.createdBy,
     })
     const state = result === "queued" ? "queued" : "skipped"

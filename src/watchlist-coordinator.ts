@@ -51,10 +51,21 @@ export class WatchlistCoordinator {
     const addedCode = action === "add" ? change.code : undefined
     const quoteMissing = addedCode !== undefined && this.#market.findQuote(addedCode) === undefined
     if (refreshWasRunning || quoteMissing) await this.#refresh()
-    if (addedCode !== undefined && this.#market.findQuote(addedCode) === undefined) {
-      return { ...change, message: `${change.message}，行情暂未加载` }
+    if (addedCode === undefined || this.#market.findQuote(addedCode) !== undefined) return change
+    // 其他代码都有行情、唯独新代码无数据：视为无效代码回滚，避免幽灵条目永远"等待行情"
+    if ((this.#market.snapshot?.quotes.length ?? 0) > 0) {
+      const rollback = this.#service.remove(addedCode)
+      if (rollback.ok) {
+        this.#market.setWatchlist(this.#service.codes)
+        this.syncMarketCodes()
+      }
+      return {
+        ok: false,
+        code: addedCode,
+        message: `无法获取 ${addedCode} 的行情（数据源无此代码），未加入自选股`,
+      }
     }
-    return change
+    return { ...change, message: `${change.message}，行情暂未加载` }
   }
 
   syncMarketCodes(): void {

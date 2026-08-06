@@ -283,6 +283,35 @@ describe("AStock Pi Agent 工具", () => {
     }
   })
 
+  test("定时任务工具支持 research 模式并在列表中呈现模式", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "astocktui-task-agent-tools-"))
+    try {
+      const state = toolContext()
+      const service = new ScheduledTaskService({
+        store: new ScheduledTaskStore(join(directory, "scheduled-tasks.json")),
+        sink: { enqueue: () => "queued" },
+        now: () => new Date("2026-07-17T01:00:00.000Z"),
+      })
+      state.context.scheduledTasks = () => service
+      const tools = createAStockAgentTools(state.context)
+      expect(
+        await runTool(tools, "manage_scheduled_task", {
+          action: "create",
+          name: "收盘复盘",
+          prompt: "复盘今日市场与持仓",
+          schedule: { kind: "daily", time: "15:10" },
+          mode: "research",
+        }),
+      ).toMatchObject({ id: "TASK-0001", mode: "research" })
+      expect(await runTool(tools, "manage_scheduled_task", { action: "list" })).toMatchObject({
+        total: 1,
+        tasks: [{ id: "TASK-0001", mode: "research" }],
+      })
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
   test("定时任务调度规则对模型呈现为扁平 schema", () => {
     const tools = createAStockAgentTools(toolContext().context)
     const tool = tools.find((candidate) => candidate.name === "manage_scheduled_task")

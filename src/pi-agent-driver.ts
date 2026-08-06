@@ -2,16 +2,16 @@ import type { Agent, AgentEvent, AgentTool } from "@oh-my-pi/pi-agent-core"
 import {
   appendedAssistantOutcomes,
   type ConversationSummarizer,
-  exclusivelyFailed,
   recoverInterruptedTurn,
+  recoverTextToolCallTurn,
 } from "./agent-context-recovery"
 import type { AgentDriver, AgentDriverEvent } from "./agent-controller"
 import type { AgentExtensionRuntime } from "./agent-extensions"
 import {
   type AgentModelOption,
+  decidePrimaryRevert,
   isQuotaExhaustedError,
-  parseFallbackModelList,
-  resolveModelChain,
+  resolveModelTarget,
 } from "./agent-models"
 import type { AgentSessionStore } from "./agent-session-store"
 import {
@@ -25,9 +25,6 @@ import { authorizeAgentTool, SYSTEM_PROMPT } from "./pi-agent-prompt"
 import { summarizeToolResult } from "./tool-result-summary"
 
 export { authorizeAgentTool, SYSTEM_PROMPT }
-
-/** 额度回退后重新尝试主模型的间隔（额度通常按数小时窗口重置） */
-export const FALLBACK_RETRY_MS = 60 * 60 * 1000
 
 export class PiAgentDriver implements AgentDriver {
   readonly #agent: Agent
@@ -103,30 +100,14 @@ export class PiAgentDriver implements AgentDriver {
   }
 
   selectModel(target: string): string {
-    const ordinal = Number(target)
-    let index =
-      Number.isInteger(ordinal) && ordinal >= 1
-        ? ordinal - 1
-        : this.#models.findIndex((option) => option.label === target)
-    if (index < 0 || index >= this.#models.length) {
-      const spec = parseFallbackModelList(target)[0]
-      if (spec === undefined) throw new Error(`无效模型：${target}`)
-      const resolved = resolveModelChain({
-        provider: spec.provider,
-        modelId: spec.model,
-        fallbackSpecs: [],
-      })
-      const option = resolved.chain[0]
-      if (resolved.error !== null || option === undefined)
-        throw new Error(resolved.error ?? `模型不存在：${target}`)
-      this.#models = [...this.#models, option]
-      index = this.#models.length - 1
-    }
+    const resolution = resolveModelTarget(this.#models, target)
+    if ("error" in resolution) throw new Error(resolution.error)
+    this.#models = resolution.models
     // 手动选择生效即视为用户接管，取消额度回退的自动回切
     this.#quotaFellBackAt = null
-    if (index === this.#modelIndex) return this.modelLabel
-    this.#modelIndex = index
-    const option = this.#models[index]
+    if (resolution.index === this.#modelIndex) return this.modelLabel
+    this.#modelIndex = resolution.index
+    const option = this.#models[resolution.index]
     if (option === undefined) throw new Error(`无效模型：${target}`)
     this.#agent.setModel(option.model)
     this.#onDebug?.("agent_model_switch", { to: option.label })
@@ -160,7 +141,14 @@ export class PiAgentDriver implements AgentDriver {
   async run(input: string, emit: (event: AgentDriverEvent) => void): Promise<void> {
     this.#emit = emit
     this.#currentInput = input
-    this.#maybeRevertToPrimary()
+    const revert = decidePrimaryRevert(this.#modelIndex, this.#quotaFellBackAt, this.#models)
+    if (revert.clear) this.#quotaFellBackAt = null
+    if (revert.primary !== undefined) {
+      this.#modelIndex = 0
+      this.#agent.setModel(revert.primary.model)
+      this.#onDebug?.("agent_fallback_retry", { to: revert.primary.label })
+      this.#onModelChange?.()
+    }
     this.#agent.setSystemPrompt(this.#composePrompt())
     try {
       let base = this.#agent.state.messages.length
@@ -177,6 +165,12 @@ export class PiAgentDriver implements AgentDriver {
         advanceAfterQuotaFailure: (attemptBase) => this.#advanceAfterQuotaFailure(attemptBase),
         onDebug: this.#onDebug,
       })
+      await recoverTextToolCallTurn({
+        agent: this.#agent,
+        base,
+        advanceAfterQuotaFailure: (attemptBase) => this.#advanceAfterQuotaFailure(attemptBase),
+        onDebug: this.#onDebug,
+      })
       const fatal = this.#fatalError(base)
       if (fatal !== null) {
         this.#onDebug?.("agent_error", { model: this.modelLabel, error: fatal.message })
@@ -190,32 +184,13 @@ export class PiAgentDriver implements AgentDriver {
     }
   }
 
-  /** 回退满一个重试间隔后，在下一次运行时切回主模型；若仍限流会再次自动回退 */
-  #maybeRevertToPrimary(): void {
-    if (this.#quotaFellBackAt === null) return
-    if (this.#modelIndex === 0) {
-      this.#quotaFellBackAt = null
-      return
-    }
-    if (Date.now() - this.#quotaFellBackAt < FALLBACK_RETRY_MS) return
-    this.#quotaFellBackAt = null
-    this.#modelIndex = 0
-    const primary = this.#models[0]
-    if (primary === undefined) return
-    this.#agent.setModel(primary.model)
-    this.#onDebug?.("agent_fallback_retry", { to: primary.label })
-    this.#onModelChange?.()
-  }
-
   #advanceAfterQuotaFailure(base: number): boolean {
-    const assistants = appendedAssistantOutcomes(this.#agent.state.messages, base)
-    if (!exclusivelyFailed(assistants)) return false
-    const exhausted = assistants.some(
-      (message) =>
-        message.stopReason === "error" && isQuotaExhaustedError(message.errorMessage ?? ""),
-    )
-    if (!exhausted || this.#modelIndex + 1 >= this.#models.length) return false
-    const reason = assistants.find((message) => message.stopReason === "error")?.errorMessage
+    // 与上下文超限同理：多步回合前面可能有成功步骤，只看末条是否额度耗尽
+    const last = appendedAssistantOutcomes(this.#agent.state.messages, base).at(-1)
+    if (last?.stopReason !== "error" || !isQuotaExhaustedError(last.errorMessage ?? "")) {
+      return false
+    }
+    if (this.#modelIndex + 1 >= this.#models.length) return false
     this.#agent.replaceMessages(this.#agent.state.messages.slice(0, base + 1))
     this.#modelIndex++
     this.#quotaFellBackAt = Date.now()
@@ -223,18 +198,16 @@ export class PiAgentDriver implements AgentDriver {
     if (next === undefined) return false
     const from = this.#models[this.#modelIndex - 1]?.label ?? ""
     this.#agent.setModel(next.model)
-    this.#onDebug?.("agent_fallback", { from, to: next.label, reason: reason ?? "" })
+    this.#onDebug?.("agent_fallback", { from, to: next.label, reason: last.errorMessage ?? "" })
     this.#onModelChange?.()
     return true
   }
 
   #fatalError(base: number): Error | null {
-    const assistants = appendedAssistantOutcomes(this.#agent.state.messages, base)
-    if (!exclusivelyFailed(assistants)) return null
-    const failed = assistants.find(
-      (message) => message.stopReason === "error" && message.errorMessage !== undefined,
-    )
-    return failed === undefined ? null : new Error(failed.errorMessage)
+    // 回合以错误收尾即视为失败（多步回合前面可能有成功步骤）；aborted 不算
+    const last = appendedAssistantOutcomes(this.#agent.state.messages, base).at(-1)
+    if (last?.stopReason !== "error" || last.errorMessage === undefined) return null
+    return new Error(last.errorMessage)
   }
 
   #composePrompt(): string[] {

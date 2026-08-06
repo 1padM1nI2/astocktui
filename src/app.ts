@@ -32,6 +32,8 @@ import { PublicMarketOverviewDataSource } from "./market-overview-source"
 import { MemoryService } from "./memory-service"
 import type { NewsDataSource } from "./news-data"
 import { createPiAgentController } from "./pi-agent"
+import { runResearchTask } from "./research-agent"
+import { createScheduledTaskSink } from "./research-task-runner"
 import { PaperTradingService } from "./trading"
 import { isContinuousAuction } from "./trading-calendar"
 import { WatchlistService } from "./watchlist"
@@ -114,7 +116,12 @@ export class MarketIntelligenceApp implements Component {
     this.#automation =
       automation ??
       defaultAutomation({
-        sink: this.#dispatcher,
+        sink: createScheduledTaskSink({
+          context: this.#commandContext(),
+          dispatcher: this.#dispatcher,
+          tasks: () => this.#automation.tasks,
+          runResearch: runResearchTask,
+        }),
         timer: refreshScheduler,
         lotSize: this.#trading.lotSize,
       })

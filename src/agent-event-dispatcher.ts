@@ -1,6 +1,7 @@
 import type { AgentController } from "./agent-controller"
+import type { ScheduledTaskMode } from "./scheduled-tasks"
 
-export type AgentTaskKind = "condition" | "dream" | "custom"
+export type AgentTaskKind = "condition" | "dream" | "custom" | "research"
 
 export interface AgentSystemEvent {
   readonly kind: AgentTaskKind
@@ -10,6 +11,7 @@ export interface AgentSystemEvent {
   readonly createdAt: string
   readonly taskId?: string
   readonly taskName?: string
+  readonly mode?: ScheduledTaskMode
   readonly source?: "user" | "agent"
 }
 

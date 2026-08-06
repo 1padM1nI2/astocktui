@@ -7,11 +7,14 @@ export type ScheduledTaskSchedule =
 
 export type ScheduledTaskRunState = "queued" | "skipped" | "completed" | "failed"
 export type ScheduledTaskSource = "user" | "agent"
+/** 任务执行模式：agent 由主对话处理；research 交给只读调研子任务产出复盘报告 */
+export type ScheduledTaskMode = "agent" | "research"
 
 export interface ScheduledTaskInput {
   readonly name: string
   readonly prompt: string
   readonly schedule: ScheduledTaskSchedule
+  readonly mode?: ScheduledTaskMode
 }
 
 export interface ScheduledTask {
@@ -19,6 +22,7 @@ export interface ScheduledTask {
   readonly name: string
   readonly prompt: string
   readonly schedule: ScheduledTaskSchedule
+  readonly mode?: ScheduledTaskMode
   readonly createdBy: ScheduledTaskSource
   readonly createdAt: string
   readonly updatedAt: string
@@ -51,7 +55,10 @@ export function validateScheduledTaskInput(
   if (prompt.length === 0 || prompt.length > MAX_PROMPT_LENGTH)
     return invalid("任务提示长度必须为 1 到 4000 个字符")
   if (!isScheduleValid(input.schedule, now)) return invalid(scheduleError(input.schedule))
-  return { ok: true, value: { name, prompt, schedule: input.schedule } }
+  if (input.mode !== undefined && input.mode !== "agent" && input.mode !== "research")
+    return invalid("任务模式必须是 agent 或 research")
+  const mode = input.mode ?? "agent"
+  return { ok: true, value: { name, prompt, schedule: input.schedule, mode } }
 }
 
 export function nextScheduledRunAt(schedule: ScheduledTaskSchedule, now: Date): string | null {

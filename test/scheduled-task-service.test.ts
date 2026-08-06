@@ -78,6 +78,58 @@ describe("自定义定时任务服务", () => {
     }
   })
 
+  test("到期任务事件携带任务模式，缺省按 agent", () => {
+    const { directory, events, service } = fixture()
+    try {
+      now = new Date("2026-07-17T01:00:00.000Z")
+      const research = service.create(
+        {
+          name: "收盘复盘",
+          prompt: "复盘",
+          schedule: { kind: "interval", minutes: 1 },
+          mode: "research",
+        },
+        "agent",
+      )
+      const plain = service.create(
+        { name: "盘前检查", prompt: "检查", schedule: { kind: "interval", minutes: 1 } },
+        "user",
+      )
+      now = new Date("2026-07-17T01:01:00.000Z")
+      service.tick(now)
+      expect(events).toHaveLength(2)
+      expect(events[0]).toMatchObject({ taskId: research.id, mode: "research" })
+      expect(events[1]).toMatchObject({ taskId: plain.id, mode: "agent" })
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test("markRunResult 写入真实完成状态并持久化", () => {
+    const { directory, service } = fixture()
+    try {
+      const task = service.create(
+        { name: "收盘复盘", prompt: "复盘", schedule: { kind: "interval", minutes: 60 } },
+        "agent",
+      )
+      expect(service.runNow(task.id)).toBe("queued")
+      service.markRunResult(task.id, "completed")
+      expect(service.get(task.id)?.lastRun).toMatchObject({ state: "completed" })
+      service.markRunResult(task.id, "failed", "模型不可用")
+      expect(service.get(task.id)?.lastRun).toMatchObject({
+        state: "failed",
+        reason: "模型不可用",
+      })
+      const reloaded = new ScheduledTaskService({
+        store: new ScheduledTaskStore(join(directory, "scheduled-tasks.json")),
+        sink: { enqueue: () => "queued" },
+      })
+      expect(reloaded.get(task.id)?.lastRun).toMatchObject({ state: "failed" })
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
   test("start 立即调度到期任务并周期 tick，stop 后不再触发", () => {
     const directory = mkdtempSync(join(tmpdir(), "astocktui-scheduled-task-service-"))
     const events: unknown[] = []

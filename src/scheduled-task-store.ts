@@ -55,6 +55,7 @@ function isTask(value: unknown): value is ScheduledTask {
     isNonEmptyString(value["name"]) &&
     isNonEmptyString(value["prompt"]) &&
     isSchedule(value["schedule"]) &&
+    (value["mode"] === undefined || value["mode"] === "agent" || value["mode"] === "research") &&
     (value["createdBy"] === "user" || value["createdBy"] === "agent") &&
     isIsoDate(value["createdAt"]) &&
     isIsoDate(value["updatedAt"]) &&
