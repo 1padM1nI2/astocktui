@@ -82,11 +82,19 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 - Storage: versioned JSON is atomically replaced at `%LOCALAPPDATA%\\AStockTUI\\paper-account.json` on Windows, `$XDG_DATA_HOME/astocktui/paper-account.json` when configured, or `~/.astocktui/paper-account.json` as fallback. Invalid state aborts loading instead of silently resetting assets.
 
 ### BacktestCommand
-- Scope: `/backtest <代码> [策略] [参数=值 …]`（别名 `/bt`）用东财前复权日 K 回测单只 A 股的交易策略，验证策略在历史数据上的可行性。
+- Scope: `/backtest <代码[,代码…]|watch> [策略] [参数=值 …]`（别名 `/bt`）用东财前复权日 K 回测 A 股交易策略，验证策略在历史数据上的可行性；逗号分隔多代码（上限 20 只）或 `watch`（整个自选股列表）进入批量模式。
 - Strategies: `ma-cross`（fast=5 slow=20 双均线交叉）、`rsi`（period=14 oversold=30 overbought=70 超买超卖）、`breakout`（entry=20 exit=10 通道突破）；`days`（30–1000，默认 250）与 `cash`（默认 ¥100,000）为保留参数，未知策略或参数键报错并列出可选项。
 - Execution: 策略在第 i 日收盘出信号，第 i+1 日开盘成交；买入按含费用可负担的最大整手满仓，卖出清仓；信号成交机制天然满足 T+1。费用口径与 PaperTradingService 一致（佣金万三最低五元、卖出印花税万五、过户费十万分之一）。
-- Output: 区间与交易日数、期末资产、总收益、年化（252 个交易日折算）、最大回撤、夏普、交易次数、胜率、买入持有基准与超额收益、40 列权益走势 sparkline、最近五笔成交；红涨绿跌带符号，所有行宽不超过 80 列。
+- Output: 单只标的输出区间与交易日数、期末资产、总收益、年化（252 个交易日折算）、最大回撤、夏普、交易次数、胜率、买入持有基准与超额收益、40 列权益走势 sparkline、最近五笔成交；批量模式输出按总收益降序的对比表（代码、总收益、年化、回撤、胜率、交易、超额），单只失败降级为行内原因。红涨绿跌带符号，所有行宽不超过 80 列。
 - Data: 前复权（fqt=1）保证分红拆股后均线信号不断裂；网络或 HTTP 错误转为明确的失败输出，历史数据少于策略预热期加两根时报数据不足。
+
+### ScreenCommand
+- Scope: `/screen [策略] [参数=值 …] [source=watch|hot]` 按策略信号选股：扫描自选股（默认）或股吧人气榜（前 50 只），报告最新交易日产生买入或卖出信号的标的。
+- Output: 买入信号（红）与卖出信号（绿）分组列出代码、收盘价与信号日期，附无信号与失败统计；失败标的逐行给出原因（最多三条）。
+
+### BacktestAgentTools
+- Tools: `run_backtest`（单只回测，返回区间、指标与最近十笔成交）、`batch_backtest`（多只或自选股批量回测，按总收益降序返回结构化行）、`screen_stocks`（按策略信号扫描自选股或热榜，返回 hits/quiet/failures 分组）；三者与 `/backtest`、`/screen` 命令共用同一数据、策略、引擎与筛选模块，均为只读 approval。
+- Prompt: 系统提示引导 Agent 在用户要求验证策略或按信号选股时调用这些工具，并要求解读时声明历史模拟不代表未来收益。
 
 ### TradeHistoryWorkspace
 - Structure: a focusable read-only workspace (fifth tab, after Agent) showing persisted fills newest-first, with order ID, side, code, quantity, execution price, date, fees, and realized profit on sells.
@@ -123,7 +131,7 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 ### CommandPalette
 - Scope: application-local commands only; it never executes shell commands.
 - Registry: command metadata is the single source for parsing, filtering, completion, `/help`, and visible descriptions.
-- Commands: `/help`, `/status`, `/focus`, `/refresh`, `/watch`, `/portfolio`, `/preview`, `/buy`, `/sell`, `/trades`, `/backtest`, `/account reset confirm`, `/clear`, `/memory`, `/quit`, and `/exit`.
+- Commands: `/help`, `/status`, `/focus`, `/refresh`, `/watch`, `/portfolio`, `/preview`, `/buy`, `/sell`, `/trades`, `/backtest`, `/screen`, `/account reset confirm`, `/clear`, `/memory`, `/quit`, and `/exit`.
 - Keyboard: typing `/` from any workspace focuses Agent and opens the palette; Up and Down select; Tab completes; Enter executes an exact command; Esc closes the palette. Suggestions and keyboard help remain immediately above the prompt.
 - Plain text that does not start with `/` remains an Agent question, except the exact bare commands `quit` and `exit`, which exit the application.
 

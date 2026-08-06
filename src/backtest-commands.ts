@@ -1,3 +1,4 @@
+import { renderBatchReport, runBatchBacktest } from "./backtest-batch"
 import { type BacktestHttp, fetchDailyKlines } from "./backtest-data"
 import { type BacktestResult, runBacktest } from "./backtest-engine"
 import { type BacktestMetrics, computeMetrics } from "./backtest-metrics"
@@ -7,11 +8,12 @@ import type { AppCommand, CommandResult } from "./commands"
 import { isAshareCode, normalizeMarketCode } from "./market-code"
 import type { KlineBar } from "./market-data"
 
-const USAGE = "/backtest <代码> [策略] [参数=值 …]"
+const USAGE = "/backtest <代码[,代码…]|watch> [策略] [参数=值 …]"
 const DEFAULT_STRATEGY = "ma-cross"
 const DEFAULT_DAYS = 250
 const DEFAULT_CASH = 100_000
 const MAX_DAYS = 1000
+const MAX_CODES = 20
 const HTTP_TIMEOUT_MS = 10_000
 const SPARKLINE_COLS = 40
 const RECENT_TRADES = 5
@@ -20,23 +22,23 @@ const SPARK_CHARS = "▁▂▃▄▅▆▇█"
 const defaultHttp: BacktestHttp = { fetch: (input) => fetch(input) }
 
 export interface BacktestArgs {
-  readonly code: string
+  readonly codes: readonly string[] | "watch"
   readonly strategyName: string
   readonly params: Readonly<Record<string, number>>
   readonly days: number
   readonly cash: number
 }
 
-export function parseBacktestArgs(args: readonly string[]): BacktestArgs | { error: string } {
-  const codeArg = args[0]
-  if (codeArg === undefined) return { error: "缺少股票代码" }
-  const code = normalizeMarketCode(codeArg)
-  if (code === null || !isAshareCode(code)) return { error: `仅支持 A 股代码：${codeArg}` }
+/** 解析策略名与数值参数；不属于策略参数的 key=value 放入 rest 由调用方校验 */
+export function parseStrategyTokens(
+  tokens: readonly string[],
+):
+  | { strategyName: string; params: Record<string, number>; rest: Record<string, string> }
+  | { error: string } {
   let strategyName = DEFAULT_STRATEGY
   const params: Record<string, number> = {}
-  let days = DEFAULT_DAYS
-  let cash = DEFAULT_CASH
-  for (const token of args.slice(1)) {
+  const rest: Record<string, string> = {}
+  for (const token of tokens) {
     const eq = token.indexOf("=")
     if (eq < 0) {
       if (strategyName !== DEFAULT_STRATEGY) return { error: `多余参数：${token}` }
@@ -44,29 +46,56 @@ export function parseBacktestArgs(args: readonly string[]): BacktestArgs | { err
       continue
     }
     const key = token.slice(0, eq)
-    const value = Number(token.slice(eq + 1))
-    if (!Number.isFinite(value)) return { error: `参数 ${key} 不是数值` }
+    const raw = token.slice(eq + 1)
+    const declared = listStrategies()
+      .find((info) => info.name === strategyName)
+      ?.params.some((param) => param.key === key)
+    if (declared === true) {
+      const value = Number(raw)
+      if (!Number.isFinite(value)) return { error: `参数 ${key} 不是数值` }
+      params[key] = value
+    } else {
+      rest[key] = raw
+    }
+  }
+  return { strategyName, params, rest }
+}
+
+export function parseBacktestArgs(args: readonly string[]): BacktestArgs | { error: string } {
+  const codeArg = args[0]
+  if (codeArg === undefined) return { error: "缺少股票代码" }
+  let codes: readonly string[] | "watch"
+  if (codeArg.toLowerCase() === "watch") {
+    codes = "watch"
+  } else {
+    const normalized: string[] = []
+    for (const token of codeArg.split(",")) {
+      const code = normalizeMarketCode(token)
+      if (code === null || !isAshareCode(code)) return { error: `仅支持 A 股代码：${token}` }
+      if (!normalized.includes(code)) normalized.push(code)
+    }
+    if (normalized.length > MAX_CODES) return { error: `一次最多回测 ${MAX_CODES} 只标的` }
+    codes = normalized
+  }
+  const parsed = parseStrategyTokens(args.slice(1))
+  if ("error" in parsed) return parsed
+  let days = DEFAULT_DAYS
+  let cash = DEFAULT_CASH
+  for (const [key, raw] of Object.entries(parsed.rest)) {
+    const value = Number(raw)
     if (key === "days") {
       if (!Number.isInteger(value) || value < 30 || value > MAX_DAYS) {
         return { error: `days 必须是 30~${MAX_DAYS} 的整数` }
       }
       days = value
     } else if (key === "cash") {
-      if (value <= 0) return { error: "cash 必须为正数" }
+      if (!Number.isFinite(value) || value <= 0) return { error: "cash 必须为正数" }
       cash = value
     } else {
-      params[key] = value
+      return { error: `未知参数：${key}` }
     }
   }
-  const known = listStrategies().find((info) => info.name === strategyName)
-  if (known !== undefined) {
-    for (const key of Object.keys(params)) {
-      if (!known.params.some((param) => param.key === key)) {
-        return { error: `策略 ${strategyName} 不支持参数 ${key}` }
-      }
-    }
-  }
-  return { code, strategyName, params, days, cash }
+  return { codes, strategyName: parsed.strategyName, params: parsed.params, days, cash }
 }
 
 function percent(value: number | null): string {
@@ -158,7 +187,7 @@ export function createBacktestCommands(http: BacktestHttp = defaultHttp): readon
       category: "data",
       usage: USAGE,
       description: "用历史日K回测交易策略（ma-cross / rsi / breakout）",
-      async execute(_context, args) {
+      async execute(context, args) {
         const parsed = parseBacktestArgs(args)
         if ("error" in parsed) return failure(parsed.error)
         const strategy = createStrategy(parsed.strategyName, parsed.params)
@@ -171,9 +200,23 @@ export function createBacktestCommands(http: BacktestHttp = defaultHttp): readon
             .join("、")
           return failure(`策略不可用：${parsed.strategyName}，可选 ${available}`)
         }
+        const codes = parsed.codes === "watch" ? [...context.watchlist()] : parsed.codes
+        if (codes.length === 0) return failure("自选股为空，先用 /watch add <代码> 添加", false)
+        if (codes.length > 1) {
+          const rows = await runBatchBacktest(http, HTTP_TIMEOUT_MS, codes, strategy, {
+            initialCapital: parsed.cash,
+            days: parsed.days,
+          })
+          return {
+            kind: "output",
+            title: `批量回测 · ${strategy.name}`,
+            lines: renderBatchReport(strategy, parsed.days, rows),
+          }
+        }
+        const code = codes[0] ?? ""
         let bars: readonly KlineBar[]
         try {
-          bars = await fetchDailyKlines(http, HTTP_TIMEOUT_MS, parsed.code, parsed.days)
+          bars = await fetchDailyKlines(http, HTTP_TIMEOUT_MS, code, parsed.days)
         } catch (error) {
           return failure(error instanceof Error ? error.message : "历史K线获取失败", false)
         }
@@ -184,7 +227,7 @@ export function createBacktestCommands(http: BacktestHttp = defaultHttp): readon
         const result = runBacktest(bars, strategy, { initialCapital: parsed.cash })
         return {
           kind: "output",
-          title: `回测 ${parsed.code} · ${strategy.name}`,
+          title: `回测 ${code} · ${strategy.name}`,
           lines: renderBacktestReport(strategy, bars, result, computeMetrics(result)),
         }
       },

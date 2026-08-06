@@ -85,6 +85,7 @@ describe("应用命令注册表", () => {
       "trades",
       "account",
       "backtest",
+      "screen",
       "mcp",
       "clear",
       "condition",
