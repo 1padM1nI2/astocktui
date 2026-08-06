@@ -1,4 +1,5 @@
 import { AUTOMATION_COMMANDS } from "./automation-commands"
+import { BACKTEST_COMMANDS } from "./backtest-commands"
 import { ANSI } from "./colors"
 import type { CommandContext, DataStatus, WorkspaceName } from "./command-context"
 import { MEMORY_COMMANDS } from "./memory-commands"
@@ -195,6 +196,7 @@ export const APP_COMMANDS: readonly AppCommand[] = [
     execute: portfolioCommand,
   },
   ...TRADING_COMMANDS,
+  ...BACKTEST_COMMANDS,
   {
     name: "mcp",
     aliases: [],

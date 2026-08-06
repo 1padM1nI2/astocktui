@@ -81,6 +81,13 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 - Lifecycle: the default account starts with ¥100,000 and persists cash, positions, T+1 lots, mark prices, sequence, and trade records after every successful mutation; reset requires `/account reset confirm` and persists immediately.
 - Storage: versioned JSON is atomically replaced at `%LOCALAPPDATA%\\AStockTUI\\paper-account.json` on Windows, `$XDG_DATA_HOME/astocktui/paper-account.json` when configured, or `~/.astocktui/paper-account.json` as fallback. Invalid state aborts loading instead of silently resetting assets.
 
+### BacktestCommand
+- Scope: `/backtest <代码> [策略] [参数=值 …]`（别名 `/bt`）用东财前复权日 K 回测单只 A 股的交易策略，验证策略在历史数据上的可行性。
+- Strategies: `ma-cross`（fast=5 slow=20 双均线交叉）、`rsi`（period=14 oversold=30 overbought=70 超买超卖）、`breakout`（entry=20 exit=10 通道突破）；`days`（30–1000，默认 250）与 `cash`（默认 ¥100,000）为保留参数，未知策略或参数键报错并列出可选项。
+- Execution: 策略在第 i 日收盘出信号，第 i+1 日开盘成交；买入按含费用可负担的最大整手满仓，卖出清仓；信号成交机制天然满足 T+1。费用口径与 PaperTradingService 一致（佣金万三最低五元、卖出印花税万五、过户费十万分之一）。
+- Output: 区间与交易日数、期末资产、总收益、年化（252 个交易日折算）、最大回撤、夏普、交易次数、胜率、买入持有基准与超额收益、40 列权益走势 sparkline、最近五笔成交；红涨绿跌带符号，所有行宽不超过 80 列。
+- Data: 前复权（fqt=1）保证分红拆股后均线信号不断裂；网络或 HTTP 错误转为明确的失败输出，历史数据少于策略预热期加两根时报数据不足。
+
 ### TradeHistoryWorkspace
 - Structure: a focusable read-only workspace (fifth tab, after Agent) showing persisted fills newest-first, with order ID, side, code, quantity, execution price, date, fees, and realized profit on sells.
 - States: empty, buy, profitable sell, losing sell; profit uses A-share red and loss uses green while signed values remain visible without color.
@@ -116,7 +123,7 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 ### CommandPalette
 - Scope: application-local commands only; it never executes shell commands.
 - Registry: command metadata is the single source for parsing, filtering, completion, `/help`, and visible descriptions.
-- Commands: `/help`, `/status`, `/focus`, `/refresh`, `/watch`, `/portfolio`, `/preview`, `/buy`, `/sell`, `/trades`, `/account reset confirm`, `/clear`, `/memory`, `/quit`, and `/exit`.
+- Commands: `/help`, `/status`, `/focus`, `/refresh`, `/watch`, `/portfolio`, `/preview`, `/buy`, `/sell`, `/trades`, `/backtest`, `/account reset confirm`, `/clear`, `/memory`, `/quit`, and `/exit`.
 - Keyboard: typing `/` from any workspace focuses Agent and opens the palette; Up and Down select; Tab completes; Enter executes an exact command; Esc closes the palette. Suggestions and keyboard help remain immediately above the prompt.
 - Plain text that does not start with `/` remains an Agent question, except the exact bare commands `quit` and `exit`, which exit the application.
 
