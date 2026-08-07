@@ -1,8 +1,8 @@
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { ANSI } from "../colors"
-import { renderKlineChart } from "../kline-chart"
-import type { KlineBar, MarketQuote } from "../market-data"
-import { alignCell, fitLine } from "../width"
+import { ANSI } from "../app/colors"
+import { alignCell, fitLine } from "../app/width"
+import type { KlineBar, MarketQuote } from "../market/data"
+import { renderKlineChart } from "../market/kline-chart"
 
 export interface MarketDetailView {
   readonly code: string

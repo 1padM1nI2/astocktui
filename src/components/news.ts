@@ -1,11 +1,11 @@
 import type { Component } from "@oh-my-pi/pi-tui"
-import { ANSI, highlightReverse } from "../colors"
-import { MarketSelectionController } from "../market-selection"
-import { type ArticleLoader, loadArticleText } from "../news-article"
-import type { FinancialNewsItem, FinancialNewsSnapshot } from "../news-data"
-import { shanghaiDateTime } from "../trading-calendar"
-import { fitLine, wrapText } from "../width"
-import type { ListScrollState } from "../workspace-scroll"
+import { ANSI, highlightReverse } from "../app/colors"
+import { MarketSelectionController } from "../app/market-selection"
+import { fitLine, wrapText } from "../app/width"
+import type { ListScrollState } from "../app/workspace-scroll"
+import { type ArticleLoader, loadArticleText } from "../news/article"
+import type { FinancialNewsItem, FinancialNewsSnapshot } from "../news/data"
+import { shanghaiDateTime } from "../trading/calendar"
 
 interface DisplayHeadline {
   readonly time: string

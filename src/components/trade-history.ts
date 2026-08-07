@@ -1,10 +1,10 @@
 import type { Component } from "@oh-my-pi/pi-tui"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { ANSI } from "../colors"
-import type { PaperTradingService } from "../trading"
-import type { SimulatedTrade } from "../trading-types"
-import { fitLine } from "../width"
-import { ListScrollState } from "../workspace-scroll"
+import { ANSI } from "../app/colors"
+import { fitLine } from "../app/width"
+import { ListScrollState } from "../app/workspace-scroll"
+import type { PaperTradingService } from "../trading/trading"
+import type { SimulatedTrade } from "../trading/types"
 
 const MONEY_FORMATTER = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,

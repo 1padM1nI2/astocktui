@@ -1,4 +1,4 @@
-import { readJsonFile, writeJsonFileAtomically } from "../json-file"
+import { readJsonFile, writeJsonFileAtomically } from "../infra/json-file"
 import { isHttpUrl, SERVER_NAME } from "./config"
 
 export interface McpServerDefinition {
