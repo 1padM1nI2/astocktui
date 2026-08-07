@@ -1,4 +1,4 @@
-import type { SimulatedTrade } from "../trading/trading-types"
+import type { SimulatedTrade } from "../trading/types"
 
 export type MemoryKind = "pattern" | "evaluation"
 export type MemorySource = "system" | "agent" | "dream"

@@ -1,4 +1,4 @@
-import type { KlineBar } from "./market-data"
+import type { KlineBar } from "./data"
 
 export interface StockApiQuote {
   readonly code: string

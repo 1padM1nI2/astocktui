@@ -1,6 +1,6 @@
 import { alignCell, fitLine } from "../app/width"
-import type { MarketQuote } from "../market/market-data"
-import { isContinuousAuction } from "../trading/trading-calendar"
+import type { MarketQuote } from "../market/data"
+import { isContinuousAuction } from "../trading/calendar"
 
 const CODE_WIDTH = 6
 const NAME_WIDTH = 10

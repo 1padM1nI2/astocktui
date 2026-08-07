@@ -1,5 +1,5 @@
-import { isAshareCode } from "../market/market-code"
-import type { MarketQuote } from "../market/market-data"
+import { isAshareCode } from "../market/code"
+import type { MarketQuote } from "../market/data"
 import type { PortfolioPosition, PortfolioSnapshot } from "./portfolio"
 import {
   applyBuy,
@@ -7,7 +7,7 @@ import {
   restoreTradingPositions,
   serializeTradingState,
   type TradingPosition,
-} from "./trading-state"
+} from "./state"
 import type {
   OrderQuantity,
   PaperTradingOptions,
@@ -17,8 +17,8 @@ import type {
   TradeQuote,
   TradeResult,
   TradeSide,
-} from "./trading-types"
-import { roundMoney, tradingDate } from "./trading-utils"
+} from "./types"
+import { roundMoney, tradingDate } from "./utils"
 
 export type {
   OrderQuantity,
@@ -28,7 +28,7 @@ export type {
   TradeQuote,
   TradeResult,
   TradeSide,
-} from "./trading-types"
+} from "./types"
 
 export class PaperTradingService {
   readonly #initialCapital: number

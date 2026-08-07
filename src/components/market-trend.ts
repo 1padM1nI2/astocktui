@@ -1,6 +1,6 @@
 import { ANSI } from "../app/colors"
 import { fitLine } from "../app/width"
-import type { MarketQuote } from "../market/market-data"
+import type { MarketQuote } from "../market/data"
 
 const SPARK_LEVELS = "▁▂▃▄▅▆▇█"
 const MINI_SPARK_WIDTH = 12

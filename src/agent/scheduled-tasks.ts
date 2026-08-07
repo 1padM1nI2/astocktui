@@ -1,4 +1,4 @@
-import { parseShanghaiTimeMinutes, shanghaiDateTime } from "../trading/trading-calendar"
+import { parseShanghaiTimeMinutes, shanghaiDateTime } from "../trading/calendar"
 
 export type ScheduledTaskSchedule =
   | { readonly kind: "once"; readonly at: string }

@@ -5,7 +5,7 @@ import type {
   McpConfigSource,
   McpServerConfig,
   McpTransportKind,
-} from "../agent/agent-extension-types"
+} from "../agent/extension-types"
 
 export interface McpConfigLoadOptions {
   readonly cwd: string

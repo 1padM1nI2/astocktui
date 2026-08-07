@@ -1,7 +1,7 @@
 import { withTimeout } from "../infra/http-timeout"
+import { type ParsedMarketCode, parseMarketCode } from "./code"
+import type { MarketDataDiagnostic, MarketQuote, MarketSnapshot } from "./data"
 import { eastmoneyIndexSecid, fetchGlobalCloses } from "./global-market-klines"
-import { type ParsedMarketCode, parseMarketCode } from "./market-code"
-import type { MarketDataDiagnostic, MarketQuote, MarketSnapshot } from "./market-data"
 
 export interface GlobalMarketHttp {
   fetch(input: string, init?: RequestInit): Promise<Response>

@@ -1,5 +1,6 @@
-import type { AgentEventSink } from "../agent/agent-event-dispatcher"
-import type { MarketSnapshot } from "../market/market-data"
+import type { AgentEventSink } from "../agent/event-dispatcher"
+import type { MarketSnapshot } from "../market/data"
+import { shanghaiDateTime } from "./calendar"
 import type { ConditionalOrderStore } from "./conditional-order-store"
 import {
   type ConditionalOrder,
@@ -7,7 +8,6 @@ import {
   evaluateConditionalOrders,
   validateConditionalOrder,
 } from "./conditional-orders"
-import { shanghaiDateTime } from "./trading-calendar"
 
 export type VolumeBaselineFetcher = (code: string) => Promise<number | null>
 

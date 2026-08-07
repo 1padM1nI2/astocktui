@@ -4,7 +4,7 @@ import {
   type FinancialNewsSnapshot,
   NEWS_LIMIT,
   type NewsDataSource,
-} from "./news-data"
+} from "./data"
 
 /**
  * 快讯 + 东财公告复合新闻源：内层成功是底线（内层抛则整体抛），

@@ -1,17 +1,9 @@
 import { type CacheEnvelope, readCache, writeCache } from "../infra/disk-cache"
 import { defaultAppDataPath } from "../infra/json-file"
 import { CompositeNewsDataSource } from "../news/composite-news"
-import {
-  type FinancialNewsSnapshot,
-  type NewsDataSource,
-  NewsNowDataSource,
-} from "../news/news-data"
+import { type FinancialNewsSnapshot, type NewsDataSource, NewsNowDataSource } from "../news/data"
+import { createDefaultMarketDataSource, type MarketDataSource, type MarketSnapshot } from "./data"
 import { fetchEastmoneyAnnouncements } from "./eastmoney-extra"
-import {
-  createDefaultMarketDataSource,
-  type MarketDataSource,
-  type MarketSnapshot,
-} from "./market-data"
 
 /** 行情源磁盘兜底：成功写盘，失败回退到最近一次缓存（附 cachedAt），无缓存抛原错 */
 export class CachedMarketDataSource implements MarketDataSource {

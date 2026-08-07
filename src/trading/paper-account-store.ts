@@ -5,7 +5,7 @@ import type {
   PaperTradingPositionState,
   PaperTradingState,
   SimulatedTrade,
-} from "./trading-types"
+} from "./types"
 
 export interface PersistentPaperTradingOptions
   extends Omit<PaperTradingOptions, "state" | "onStateChange"> {

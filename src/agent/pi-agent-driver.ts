@@ -4,24 +4,24 @@ import {
   type ConversationSummarizer,
   recoverInterruptedTurn,
   recoverTextToolCallTurn,
-} from "./agent-context-recovery"
-import type { AgentDriver, AgentDriverEvent } from "./agent-controller"
-import type { AgentExtensionRuntime } from "./agent-extensions"
+} from "./context-recovery"
+import type { AgentDriver, AgentDriverEvent } from "./controller"
+import type { AgentExtensionRuntime } from "./extensions"
 import {
   type AgentModelOption,
   decidePrimaryRevert,
   isQuotaExhaustedError,
   resolveModelTarget,
-} from "./agent-models"
-import type { AgentSessionStore } from "./agent-session-store"
+} from "./models"
+import { authorizeAgentTool, SYSTEM_PROMPT } from "./pi-agent-prompt"
+import type { AgentSessionStore } from "./session-store"
 import {
   DEFAULT_THINKING_LEVEL,
   parseThinkingLevel,
   resolveThinkingEffort,
   THINKING_LEVELS,
   type ThinkingLevelName,
-} from "./agent-thinking"
-import { authorizeAgentTool, SYSTEM_PROMPT } from "./pi-agent-prompt"
+} from "./thinking"
 import { summarizeToolResult } from "./tool-result-summary"
 
 export { authorizeAgentTool, SYSTEM_PROMPT }

@@ -3,8 +3,8 @@ import { dirname, join } from "node:path"
 import { fitLine } from "../app/width"
 import type { CommandContext } from "../commands/commands"
 import { defaultAppDataPath } from "../infra/json-file"
-import { shanghaiDateTime } from "../trading/trading-calendar"
-import type { AgentEventSink, AgentSystemEvent } from "./agent-event-dispatcher"
+import { shanghaiDateTime } from "../trading/calendar"
+import type { AgentEventSink, AgentSystemEvent } from "./event-dispatcher"
 
 /** 摘要节标题与退化策略的最大行数 */
 const SUMMARY_MAX_LINES = 10

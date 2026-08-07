@@ -1,5 +1,5 @@
 import type { MarketWorkspace } from "../components/market"
-import { normalizeAshareCode } from "../market/market-data"
+import { normalizeAshareCode } from "../market/data"
 import type { PaperTradingService, TradeQuote } from "../trading/trading"
 import type { WatchlistChange, WatchlistService } from "../trading/watchlist"
 

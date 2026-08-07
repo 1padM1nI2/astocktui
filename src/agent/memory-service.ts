@@ -1,4 +1,4 @@
-import type { SimulatedTrade } from "../trading/trading-types"
+import type { SimulatedTrade } from "../trading/types"
 import {
   appendMemoryEntry,
   EMPTY_MEMORY_STATE,

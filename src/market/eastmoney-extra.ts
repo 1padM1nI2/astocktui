@@ -1,6 +1,6 @@
-import { type FinancialNewsItem, hasUnsafeTerminalControl } from "../news/news-data"
-import type { MarketCapitalSummary } from "./market-overview"
-import { parseJson, recordField } from "./market-overview-parsers"
+import { type FinancialNewsItem, hasUnsafeTerminalControl } from "../news/data"
+import type { MarketCapitalSummary } from "./overview"
+import { parseJson, recordField } from "./overview-parsers"
 
 const REQUEST_TIMEOUT_MS = 12_000
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"

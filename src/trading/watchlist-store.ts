@@ -1,5 +1,5 @@
 import { defaultAppDataPath, readJsonFile, writeJsonFileAtomically } from "../infra/json-file"
-import { normalizeMarketCode } from "../market/market-code"
+import { normalizeMarketCode } from "../market/code"
 import { type WatchlistOptions, WatchlistService, type WatchlistState } from "./watchlist"
 
 export interface PersistentWatchlistOptions

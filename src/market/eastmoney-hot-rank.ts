@@ -1,6 +1,6 @@
-import { hasUnsafeTerminalControl } from "../news/news-data"
+import { hasUnsafeTerminalControl } from "../news/data"
 import type { EastmoneyHttpResult } from "./eastmoney-extra"
-import { parseJson } from "./market-overview-parsers"
+import { parseJson } from "./overview-parsers"
 
 const REQUEST_TIMEOUT_MS = 12_000
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"

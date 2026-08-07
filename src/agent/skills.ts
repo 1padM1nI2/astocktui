@@ -1,6 +1,6 @@
 import { readdir, readFile, realpath } from "node:fs/promises"
 import { isAbsolute, join, relative, resolve, sep } from "node:path"
-import type { ExtensionDiagnostic } from "./agent-extension-types"
+import type { ExtensionDiagnostic } from "./extension-types"
 
 export type SkillSource =
   | "omp-project"

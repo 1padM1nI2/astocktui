@@ -1,6 +1,6 @@
 import { ANSI } from "../app/colors"
 import { alignCell, fitLine } from "../app/width"
-import type { KlineBar } from "./market-data"
+import type { KlineBar } from "./data"
 
 const CHART_ROWS = 8
 const VOLUME_ROWS = 3

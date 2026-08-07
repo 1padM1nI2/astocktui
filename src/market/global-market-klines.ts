@@ -1,5 +1,5 @@
 import { withTimeout } from "../infra/http-timeout"
-import type { ParsedMarketCode } from "./market-code"
+import type { ParsedMarketCode } from "./code"
 
 export interface GlobalKlineHttp {
   fetch(input: string, init?: RequestInit): Promise<Response>

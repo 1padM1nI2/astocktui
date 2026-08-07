@@ -1,4 +1,4 @@
-import type { AgentEventSink } from "../agent/agent-event-dispatcher"
+import type { AgentEventSink } from "../agent/event-dispatcher"
 import { ScheduledTaskService } from "../agent/scheduled-task-service"
 import { ScheduledTaskStore } from "../agent/scheduled-task-store"
 import type { RefreshScheduler } from "./auto-refresh"

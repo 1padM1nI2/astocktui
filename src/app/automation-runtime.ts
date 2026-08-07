@@ -1,13 +1,13 @@
 import { stocks } from "stock-api"
-import type { AgentEventSink } from "../agent/agent-event-dispatcher"
+import type { AgentEventSink } from "../agent/event-dispatcher"
 import type { ScheduledTaskService } from "../agent/scheduled-task-service"
 import type { ScheduledTaskStore } from "../agent/scheduled-task-store"
+import { shanghaiDateTime } from "../trading/calendar"
 import {
   ConditionalOrderService,
   type VolumeBaselineFetcher,
 } from "../trading/conditional-order-service"
 import { ConditionalOrderStore } from "../trading/conditional-order-store"
-import { shanghaiDateTime } from "../trading/trading-calendar"
 import type { RefreshScheduler } from "./auto-refresh"
 import { createScheduledTaskService } from "./scheduled-task-runtime"
 

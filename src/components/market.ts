@@ -3,8 +3,8 @@ import { ANSI, highlightReverse } from "../app/colors"
 import { MarketSelectionController } from "../app/market-selection"
 import { fitLine } from "../app/width"
 import type { ListScrollState } from "../app/workspace-scroll"
-import type { MarketQuote, MarketSnapshot } from "../market/market-data"
-import { DEFAULT_WATCHLIST, DEFAULT_WATCHLIST_CODES } from "../market/market-data"
+import type { MarketQuote, MarketSnapshot } from "../market/data"
+import { DEFAULT_WATCHLIST, DEFAULT_WATCHLIST_CODES } from "../market/data"
 import { renderMarketDetail } from "./market-detail"
 import {
   displayCode,

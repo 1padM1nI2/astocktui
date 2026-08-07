@@ -4,7 +4,7 @@ import { ANSI } from "../app/colors"
 import { fitLine } from "../app/width"
 import { ListScrollState } from "../app/workspace-scroll"
 import type { PaperTradingService } from "../trading/trading"
-import type { SimulatedTrade } from "../trading/trading-types"
+import type { SimulatedTrade } from "../trading/types"
 
 const MONEY_FORMATTER = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,

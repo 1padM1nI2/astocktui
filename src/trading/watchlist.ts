@@ -1,5 +1,5 @@
-import { normalizeMarketCode } from "../market/market-code"
-import { DEFAULT_WATCHLIST_CODES } from "../market/market-data"
+import { normalizeMarketCode } from "../market/code"
+import { DEFAULT_WATCHLIST_CODES } from "../market/data"
 
 export interface WatchlistState {
   readonly version: 1
