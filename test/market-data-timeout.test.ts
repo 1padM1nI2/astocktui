@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
-import { StockApiMarketDataSource } from "../src/market-data"
-import type { StockApiClient, StockApiQuote } from "../src/stock-api-types"
+import { StockApiMarketDataSource } from "../src/market/market-data"
+import type { StockApiClient, StockApiQuote } from "../src/market/stock-api-types"
 
 const QUOTE: StockApiQuote = {
   code: "SH600519",

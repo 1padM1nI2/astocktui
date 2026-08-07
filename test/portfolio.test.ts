@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { stripVTControlCharacters } from "node:util"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
 import { PortfolioWorkspace } from "../src/components/portfolio"
-import type { PortfolioSnapshot } from "../src/portfolio"
+import type { PortfolioSnapshot } from "../src/trading/portfolio"
 
 function expectFrameFits(lines: readonly string[], width: number): void {
   for (const line of lines) expect(visibleWidth(line)).toBeLessThanOrEqual(width)

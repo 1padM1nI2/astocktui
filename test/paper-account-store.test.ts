@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { createPersistentPaperTradingService, PaperAccountStore } from "../src/paper-account-store"
-import type { TradeQuote } from "../src/trading"
+import {
+  createPersistentPaperTradingService,
+  PaperAccountStore,
+} from "../src/trading/paper-account-store"
+import type { TradeQuote } from "../src/trading/trading"
 
 const QUOTE: TradeQuote = {
   code: "SZ000938",

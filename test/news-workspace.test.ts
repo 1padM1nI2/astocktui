@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
 import { stripVTControlCharacters } from "node:util"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { ANSI } from "../src/colors"
+import { ANSI } from "../src/app/colors"
 import { NewsWorkspace } from "../src/components/news"
-import type { FinancialNewsItem, FinancialNewsSnapshot } from "../src/news-data"
+import type { FinancialNewsItem, FinancialNewsSnapshot } from "../src/news/news-data"
 
 const LONG_TITLE =
   "这是一条标题特别长的新闻用于验证详情视图能够把完整标题按宽度折行显示而不是被截断"

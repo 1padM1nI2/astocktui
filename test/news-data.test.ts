@@ -5,7 +5,7 @@ import {
   type NewsHttpResponse,
   NewsNowDataSource,
   type NewsRequestOptions,
-} from "../src/news-data"
+} from "../src/news/news-data"
 
 function jsonResponse(body: unknown, status = 200): NewsHttpResponse {
   return {

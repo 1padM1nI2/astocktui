@@ -2,9 +2,9 @@ import { expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { filterCommands } from "../src/commands"
-import { buildSkillPrompt, createSkillCommands, createSkillReadTool } from "../src/skill-tool"
-import { type DiscoveredSkill, discoverSkills } from "../src/skills"
+import { buildSkillPrompt, createSkillCommands, createSkillReadTool } from "../src/agent/skill-tool"
+import { type DiscoveredSkill, discoverSkills } from "../src/agent/skills"
+import { filterCommands } from "../src/commands/commands"
 
 function skill(name: string, overrides: Partial<DiscoveredSkill> = {}): DiscoveredSkill {
   return {

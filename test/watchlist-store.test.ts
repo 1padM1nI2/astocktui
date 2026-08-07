@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { createPersistentWatchlistService, WatchlistStore } from "../src/watchlist-store"
+import { createPersistentWatchlistService, WatchlistStore } from "../src/trading/watchlist-store"
 
 function temporaryWatchlistPath(): { readonly directory: string; readonly path: string } {
   const directory = mkdtempSync(join(tmpdir(), "astocktui-watchlist-"))

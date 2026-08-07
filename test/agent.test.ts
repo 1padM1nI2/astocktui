@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { stripVTControlCharacters } from "node:util"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import type { AgentSessionView } from "../src/agent-controller"
-import { ANSI } from "../src/colors"
+import type { AgentSessionView } from "../src/agent/agent-controller"
+import { ANSI } from "../src/app/colors"
 import { AgentWorkspace } from "../src/components/agent"
 
 function expectLinesFit(lines: readonly string[], width: number): void {

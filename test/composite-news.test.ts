@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { CompositeNewsDataSource } from "../src/composite-news"
-import type { FinancialNewsItem, FinancialNewsSnapshot, NewsDataSource } from "../src/news-data"
+import { CompositeNewsDataSource } from "../src/news/composite-news"
+import type {
+  FinancialNewsItem,
+  FinancialNewsSnapshot,
+  NewsDataSource,
+} from "../src/news/news-data"
 
 function item(id: string, title: string, publishedAt: number): FinancialNewsItem {
   return { id, title, publishedAt, source: "测试" }

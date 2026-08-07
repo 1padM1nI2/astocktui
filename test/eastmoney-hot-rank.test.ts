@@ -5,7 +5,7 @@ import {
   type HotRankRequest,
   parseHotRankList,
   parseQuoteBatch,
-} from "../src/eastmoney-hot-rank"
+} from "../src/market/eastmoney-hot-rank"
 
 const RANK_PAYLOAD = {
   status: 0,

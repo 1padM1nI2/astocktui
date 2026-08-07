@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { MarketIntelligenceApp } from "../src/app"
-import type { MarketDataSource, MarketSnapshot } from "../src/market-data"
-import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news-data"
+import { MarketIntelligenceApp } from "../src/app/app"
+import type { MarketDataSource, MarketSnapshot } from "../src/market/market-data"
+import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news/news-data"
 
 const NEWS_SNAPSHOT: FinancialNewsSnapshot = {
   source: "NewsNow 2源",

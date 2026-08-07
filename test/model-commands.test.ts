@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
-import type { AgentModelSwitcher, AgentThinkingControl } from "../src/agent-controller"
-import type { CommandContext, CommandResult } from "../src/commands"
-import { MODEL_COMMANDS } from "../src/model-commands"
+import type { AgentModelSwitcher, AgentThinkingControl } from "../src/agent/agent-controller"
+import type { CommandContext, CommandResult } from "../src/commands/commands"
+import { MODEL_COMMANDS } from "../src/commands/model-commands"
 
 function contextWith(
   switcher: AgentModelSwitcher | undefined,

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
-import { AgentController, type AgentDriver } from "../src/agent-controller"
-import { AgentEventDispatcher } from "../src/agent-event-dispatcher"
+import { AgentController, type AgentDriver } from "../src/agent/agent-controller"
+import { AgentEventDispatcher } from "../src/agent/agent-event-dispatcher"
 
 class Driver implements AgentDriver {
   readonly inputs: string[] = []

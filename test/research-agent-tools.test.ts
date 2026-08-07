@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { CommandContext } from "../src/commands"
-import { createResearchAgentTools } from "../src/research-agent-tools"
+import { createResearchAgentTools } from "../src/agent/research-agent-tools"
+import type { CommandContext } from "../src/commands/commands"
 
 // 工具列表在创建期不触碰 context，仅断言集合与分级
 const context = undefined as unknown as CommandContext

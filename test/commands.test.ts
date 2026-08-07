@@ -2,17 +2,17 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { CommandPrompt } from "../src/command-prompt"
+import { ScheduledTaskService } from "../src/agent/scheduled-task-service"
+import { ScheduledTaskStore } from "../src/agent/scheduled-task-store"
+import { CommandPrompt } from "../src/commands/command-prompt"
 import {
   APP_COMMANDS,
   type CommandContext,
   type CommandResult,
   executeCommand,
   filterCommands,
-} from "../src/commands"
-import { ScheduledTaskService } from "../src/scheduled-task-service"
-import { ScheduledTaskStore } from "../src/scheduled-task-store"
-import { PaperTradingService } from "../src/trading"
+} from "../src/commands/commands"
+import { PaperTradingService } from "../src/trading/trading"
 
 function commandContext(): CommandContext & {
   readonly focused: string[]

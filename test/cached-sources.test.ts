@@ -2,16 +2,16 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { readCache, writeCache } from "../src/infra/disk-cache"
 import {
   applyStartupCaches,
   CachedMarketDataSource,
   CachedNewsDataSource,
   readCachedMarketSnapshot,
   readCachedNewsSnapshot,
-} from "../src/cached-sources"
-import { readCache, writeCache } from "../src/disk-cache"
-import type { MarketDataSource, MarketSnapshot } from "../src/market-data"
-import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news-data"
+} from "../src/market/cached-sources"
+import type { MarketDataSource, MarketSnapshot } from "../src/market/market-data"
+import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news/news-data"
 
 const MARKET_SNAPSHOT: MarketSnapshot = {
   quotes: [

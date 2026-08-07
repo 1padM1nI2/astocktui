@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core"
-import { messagesToExchanges } from "../src/agent-history"
+import { messagesToExchanges } from "../src/agent/agent-history"
 
 function msg(value: unknown): AgentMessage {
   return value as AgentMessage

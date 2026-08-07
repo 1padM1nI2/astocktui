@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test"
-import { createTencentIntradayTrendFetcher, parseTencentMinuteTrend } from "../src/intraday-trend"
+import {
+  createTencentIntradayTrendFetcher,
+  parseTencentMinuteTrend,
+} from "../src/market/intraday-trend"
 
 test("解析腾讯分时数据为当天分钟价格序列", () => {
   const payload = {

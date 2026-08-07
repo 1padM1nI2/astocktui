@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { AgentScrollState } from "../src/agent-scroll"
+import { AgentScrollState } from "../src/agent/agent-scroll"
 
 test("Agent 翻页支持应用光标模式的上下键", () => {
   const scroll = new AgentScrollState(() => 16)

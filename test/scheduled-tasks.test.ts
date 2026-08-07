@@ -3,7 +3,7 @@ import {
   nextScheduledRunAt,
   type ScheduledTaskSchedule,
   validateScheduledTaskInput,
-} from "../src/scheduled-tasks"
+} from "../src/agent/scheduled-tasks"
 
 const at = (value: string): Date => new Date(value)
 

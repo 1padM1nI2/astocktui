@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { AgentTool } from "@oh-my-pi/pi-agent-core"
-import { createFileAgentTools } from "../src/file-agent-tools"
+import { createFileAgentTools } from "../src/agent/file-agent-tools"
 
 async function runTool(
   tools: readonly AgentTool[],

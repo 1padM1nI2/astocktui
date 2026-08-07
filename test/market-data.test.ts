@@ -5,8 +5,8 @@ import {
   type MarketDataSource,
   type MarketSnapshot,
   StockApiMarketDataSource,
-} from "../src/market-data"
-import type { StockApiClient, StockApiKline, StockApiQuote } from "../src/stock-api-types"
+} from "../src/market/market-data"
+import type { StockApiClient, StockApiKline, StockApiQuote } from "../src/market/stock-api-types"
 
 function clientWith(
   quotes: readonly StockApiQuote[],

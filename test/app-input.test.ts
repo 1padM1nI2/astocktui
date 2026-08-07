@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
-import { AgentScrollState } from "../src/agent-scroll"
-import { AppInputHandler } from "../src/app-input"
-import { CommandPrompt } from "../src/command-prompt"
+import { AgentScrollState } from "../src/agent/agent-scroll"
+import { AppInputHandler } from "../src/app/app-input"
+import { CommandPrompt } from "../src/commands/command-prompt"
 
 function inputFixture(): {
   readonly handler: AppInputHandler

@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { ScheduledTaskService } from "../src/scheduled-task-service"
-import { ScheduledTaskStore } from "../src/scheduled-task-store"
+import { ScheduledTaskService } from "../src/agent/scheduled-task-service"
+import { ScheduledTaskStore } from "../src/agent/scheduled-task-store"
 
 let now = new Date("2026-07-17T01:00:00.000Z")
 

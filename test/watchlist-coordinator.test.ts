@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
-import type { MarketQuote, MarketSnapshot } from "../src/market-data"
-import { WatchlistService } from "../src/watchlist"
-import { WatchlistCoordinator } from "../src/watchlist-coordinator"
+import { WatchlistCoordinator } from "../src/app/watchlist-coordinator"
+import type { MarketQuote, MarketSnapshot } from "../src/market/market-data"
+import { WatchlistService } from "../src/trading/watchlist"
 
 function quote(code: string): MarketQuote {
   return { code, name: code, price: 1, changePercent: 0, source: "fake" }

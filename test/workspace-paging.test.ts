@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import { stripVTControlCharacters } from "node:util"
+import { renderWorkspacePanel } from "../src/app/workspace-layout"
 import { MarketWorkspace } from "../src/components/market"
 import { NewsWorkspace } from "../src/components/news"
 import { PortfolioWorkspace } from "../src/components/portfolio"
 import { TradeHistoryWorkspace } from "../src/components/trade-history"
-import type { FinancialNewsSnapshot } from "../src/news-data"
-import type { PortfolioPosition } from "../src/portfolio"
-import { PaperTradingService } from "../src/trading"
-import { renderWorkspacePanel } from "../src/workspace-layout"
+import type { FinancialNewsSnapshot } from "../src/news/news-data"
+import type { PortfolioPosition } from "../src/trading/portfolio"
+import { PaperTradingService } from "../src/trading/trading"
 
 function frameText(lines: readonly string[]): string {
   return stripVTControlCharacters(lines.join("\n"))

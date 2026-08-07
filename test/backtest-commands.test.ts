@@ -1,16 +1,16 @@
 import { describe, expect, test } from "bun:test"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
+import type { BacktestHttp } from "../src/backtest/backtest-data"
+import { runBacktest } from "../src/backtest/backtest-engine"
+import { computeMetrics } from "../src/backtest/backtest-metrics"
+import { createStrategy } from "../src/backtest/backtest-strategy"
 import {
   createBacktestCommands,
   parseBacktestArgs,
   renderBacktestReport,
-} from "../src/backtest-commands"
-import type { BacktestHttp } from "../src/backtest-data"
-import { runBacktest } from "../src/backtest-engine"
-import { computeMetrics } from "../src/backtest-metrics"
-import { createStrategy } from "../src/backtest-strategy"
-import type { CommandContext } from "../src/command-context"
-import type { KlineBar } from "../src/market-data"
+} from "../src/commands/backtest-commands"
+import type { CommandContext } from "../src/commands/command-context"
+import type { KlineBar } from "../src/market/market-data"
 
 function bars(closes: readonly number[]): KlineBar[] {
   return closes.map((close, index) => ({

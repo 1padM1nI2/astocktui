@@ -4,15 +4,19 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { stripVTControlCharacters } from "node:util"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { AgentController, type AgentDriver, type AgentDriverEvent } from "../src/agent-controller"
-import { MarketIntelligenceApp } from "../src/app"
-import { AutomationRuntime } from "../src/automation-runtime"
-import { ConditionalOrderStore } from "../src/conditional-order-store"
-import type { MarketDataSource, MarketSnapshot } from "../src/market-data"
-import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news-data"
-import { ScheduledTaskStore } from "../src/scheduled-task-store"
-import { PaperTradingService } from "../src/trading"
-import { WatchlistService } from "../src/watchlist"
+import {
+  AgentController,
+  type AgentDriver,
+  type AgentDriverEvent,
+} from "../src/agent/agent-controller"
+import { ScheduledTaskStore } from "../src/agent/scheduled-task-store"
+import { MarketIntelligenceApp } from "../src/app/app"
+import { AutomationRuntime } from "../src/app/automation-runtime"
+import type { MarketDataSource, MarketSnapshot } from "../src/market/market-data"
+import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news/news-data"
+import { ConditionalOrderStore } from "../src/trading/conditional-order-store"
+import { PaperTradingService } from "../src/trading/trading"
+import { WatchlistService } from "../src/trading/watchlist"
 
 const MARKET_SNAPSHOT: MarketSnapshot = {
   quotes: [],

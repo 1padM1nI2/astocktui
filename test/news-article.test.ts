@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
-import { type ArticleFetcher, htmlToParagraphs, loadArticleText } from "../src/news-article"
-import type { FinancialNewsItem } from "../src/news-data"
+import { type ArticleFetcher, htmlToParagraphs, loadArticleText } from "../src/news/news-article"
+import type { FinancialNewsItem } from "../src/news/news-data"
 
 function itemWith(url: string | undefined): FinancialNewsItem {
   return {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { StockSearchHttpResult } from "../src/stock-search"
-import { createEastmoneyStockSearcher, parseEastmoneySuggest } from "../src/stock-search"
+import type { StockSearchHttpResult } from "../src/market/stock-search"
+import { createEastmoneyStockSearcher, parseEastmoneySuggest } from "../src/market/stock-search"
 
 function entry(fields: Record<string, unknown>): Record<string, unknown> {
   return { Classify: "AStock", MktNum: "1", PinYin: "", ...fields }

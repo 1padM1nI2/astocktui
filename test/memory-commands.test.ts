@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { AgentSystemEvent } from "../src/agent-event-dispatcher"
-import type { CommandContext, CommandResult } from "../src/commands"
-import { MEMORY_COMMANDS } from "../src/memory-commands"
-import { MemoryService } from "../src/memory-service"
-import { MemoryStore } from "../src/memory-store"
+import type { AgentSystemEvent } from "../src/agent/agent-event-dispatcher"
+import { MemoryService } from "../src/agent/memory-service"
+import { MemoryStore } from "../src/agent/memory-store"
+import type { CommandContext, CommandResult } from "../src/commands/commands"
+import { MEMORY_COMMANDS } from "../src/commands/memory-commands"
 
 const NOW = new Date("2026-07-18T12:00:00.000Z") // 周六 20:00（上海）
 

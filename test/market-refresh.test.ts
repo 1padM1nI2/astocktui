@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { MarketIntelligenceApp } from "../src/app"
+import { MarketIntelligenceApp } from "../src/app/app"
 import { MarketWorkspace } from "../src/components/market"
-import type { MarketDataSource, MarketSnapshot } from "../src/market-data"
+import type { MarketDataSource, MarketSnapshot } from "../src/market/market-data"
 
 const SNAPSHOT: MarketSnapshot = {
   quotes: [

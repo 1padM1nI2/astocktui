@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
-import type { CommandContext, CommandResult } from "../src/commands"
-import { QUOTE_COMMANDS } from "../src/quote-commands"
-import type { StockDetail } from "../src/stock-detail"
+import type { CommandContext, CommandResult } from "../src/commands/commands"
+import { QUOTE_COMMANDS } from "../src/commands/quote-commands"
+import type { StockDetail } from "../src/market/stock-detail"
 
 const DETAIL: StockDetail = {
   code: "SH600519",

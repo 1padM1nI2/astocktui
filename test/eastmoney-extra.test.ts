@@ -8,7 +8,7 @@ import {
   parseAnnouncements,
   parseFundFlow,
   parseNorthbound,
-} from "../src/eastmoney-extra"
+} from "../src/market/eastmoney-extra"
 
 const FUND_FLOW_PAYLOAD = {
   rc: 0,

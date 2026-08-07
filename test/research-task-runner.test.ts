@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { AgentSystemEvent } from "../src/agent-event-dispatcher"
-import type { CommandContext } from "../src/commands"
-import { createScheduledTaskSink, extractSummary } from "../src/research-task-runner"
-import type { ScheduledTaskEvent } from "../src/scheduled-task-service"
+import type { AgentSystemEvent } from "../src/agent/agent-event-dispatcher"
+import { createScheduledTaskSink, extractSummary } from "../src/agent/research-task-runner"
+import type { ScheduledTaskEvent } from "../src/agent/scheduled-task-service"
+import type { CommandContext } from "../src/commands/commands"
 
 const NOW = new Date("2026-07-17T07:10:00.000Z") // 周五 15:10（上海）
 

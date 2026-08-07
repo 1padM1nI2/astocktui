@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import type { BacktestHttp } from "../src/backtest-data"
-import type { CommandContext } from "../src/command-context"
-import { createScreenCommands, parseScreenArgs } from "../src/screen-commands"
+import type { BacktestHttp } from "../src/backtest/backtest-data"
+import type { CommandContext } from "../src/commands/command-context"
+import { createScreenCommands, parseScreenArgs } from "../src/commands/screen-commands"
 
 function httpWith(closesByCode: Readonly<Record<string, readonly number[]>>): BacktestHttp {
   return {

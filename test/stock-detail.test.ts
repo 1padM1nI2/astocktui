@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { parseTencentDetail } from "../src/stock-detail"
+import { parseTencentDetail } from "../src/market/stock-detail"
 
 const PAYLOAD_519 =
   "1~贵州茅台~600519~1297.41~1292.01~1305.00~35699~17225~18474~" +

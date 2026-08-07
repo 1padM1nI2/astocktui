@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { TencentGlobalMarketDataSource } from "../src/global-market-data"
+import { TencentGlobalMarketDataSource } from "../src/market/global-market-data"
 
 function quoteLine(
   market: number,

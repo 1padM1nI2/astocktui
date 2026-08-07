@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { SYSTEM_PROMPT } from "../src/pi-agent-prompt"
+import { SYSTEM_PROMPT } from "../src/agent/pi-agent-prompt"
 
 const prompt = SYSTEM_PROMPT.join("\n")
 

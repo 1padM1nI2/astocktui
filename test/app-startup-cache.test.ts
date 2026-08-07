@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test"
 import { rmSync } from "node:fs"
-import { MarketIntelligenceApp } from "../src/app"
-import { writeCache } from "../src/disk-cache"
-import { defaultAppDataPath } from "../src/json-file"
-import type { MarketDataSource, MarketSnapshot } from "../src/market-data"
-import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news-data"
+import { MarketIntelligenceApp } from "../src/app/app"
+import { writeCache } from "../src/infra/disk-cache"
+import { defaultAppDataPath } from "../src/infra/json-file"
+import type { MarketDataSource, MarketSnapshot } from "../src/market/market-data"
+import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news/news-data"
 
 const MARKET_SNAPSHOT: MarketSnapshot = {
   quotes: [

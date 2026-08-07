@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { discoverSkills } from "../src/skills"
+import { discoverSkills } from "../src/agent/skills"
 
 async function fixture(): Promise<{ readonly root: string; readonly home: string }> {
   const root = await mkdtemp(join(tmpdir(), "astock-skills-"))

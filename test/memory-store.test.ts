@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { appendMemoryEntry, EMPTY_MEMORY_STATE } from "../src/memory"
-import { defaultMemoryPath, MemoryStore } from "../src/memory-store"
+import { appendMemoryEntry, EMPTY_MEMORY_STATE } from "../src/agent/memory"
+import { defaultMemoryPath, MemoryStore } from "../src/agent/memory-store"
 
 function temporaryMemoryPath(): { readonly directory: string; readonly path: string } {
   const directory = mkdtempSync(join(tmpdir(), "astocktui-memory-"))

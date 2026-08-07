@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { runBacktest } from "../src/backtest-engine"
-import type { BacktestStrategy } from "../src/backtest-strategy"
-import type { KlineBar } from "../src/market-data"
+import { runBacktest } from "../src/backtest/backtest-engine"
+import type { BacktestStrategy } from "../src/backtest/backtest-strategy"
+import type { KlineBar } from "../src/market/market-data"
 
 function bars(rows: readonly [open: number, close: number][]): KlineBar[] {
   return rows.map(([open, close], index) => ({

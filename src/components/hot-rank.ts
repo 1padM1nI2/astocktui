@@ -1,8 +1,8 @@
 import type { Component } from "@oh-my-pi/pi-tui"
-import { ANSI } from "../colors"
-import type { HotRankEntry, HotRankSnapshot } from "../eastmoney-hot-rank"
-import { alignCell, fitLine } from "../width"
-import { ListScrollState } from "../workspace-scroll"
+import { ANSI } from "../app/colors"
+import { alignCell, fitLine } from "../app/width"
+import { ListScrollState } from "../app/workspace-scroll"
+import type { HotRankEntry, HotRankSnapshot } from "../market/eastmoney-hot-rank"
 import { displayCode } from "./market-table"
 import { trendColor } from "./market-trend"
 

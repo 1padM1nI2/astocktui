@@ -2,10 +2,10 @@ import { expect, spyOn, test } from "bun:test"
 import type { Terminal, TerminalAppearance } from "@oh-my-pi/pi-tui"
 import { TUI } from "@oh-my-pi/pi-tui"
 import { createDemo } from "../src/main"
-import type { MarketDataSource, MarketSnapshot } from "../src/market-data"
-import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news-data"
-import { PaperTradingService } from "../src/trading"
-import { WatchlistService } from "../src/watchlist"
+import type { MarketDataSource, MarketSnapshot } from "../src/market/market-data"
+import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news/news-data"
+import { PaperTradingService } from "../src/trading/trading"
+import { WatchlistService } from "../src/trading/watchlist"
 
 class MemoryTerminal implements Terminal {
   readonly columns = 120

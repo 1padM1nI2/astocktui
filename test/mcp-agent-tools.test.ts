@@ -3,12 +3,12 @@ import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { AgentTool } from "@oh-my-pi/pi-agent-core"
-import type { McpServerConfig, McpServerStatus } from "../src/agent-extension-types"
-import { AgentExtensionRuntime } from "../src/agent-extensions"
+import type { McpServerConfig, McpServerStatus } from "../src/agent/agent-extension-types"
+import { AgentExtensionRuntime } from "../src/agent/agent-extensions"
+import { createMcpAgentTools } from "../src/agent/mcp-agent-tools"
+import { SkillRegistry } from "../src/agent/skills"
 import { loadMcpConfigs } from "../src/mcp/config"
 import type { McpServerConnection } from "../src/mcp/manager"
-import { createMcpAgentTools } from "../src/mcp-agent-tools"
-import { SkillRegistry } from "../src/skills"
 
 class FakeManager {
   statuses: McpServerStatus[] = []

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { ConditionalOrderService } from "../src/conditional-order-service"
+import { ConditionalOrderService } from "../src/trading/conditional-order-service"
 
 test("条件单触发行情事件但不直接成交", () => {
   const events: string[] = []

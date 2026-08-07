@@ -1,14 +1,14 @@
 import { expect, test } from "bun:test"
-import { MAX_TEXT_TOOLCALL_RETRIES } from "../src/agent-context-recovery"
+import { MAX_TEXT_TOOLCALL_RETRIES } from "../src/agent/agent-context-recovery"
 import {
   FALLBACK_RETRY_MS,
   isContextOverflowError,
   isQuotaExhaustedError,
   parseFallbackModelList,
   withAgentBaseUrl,
-} from "../src/agent-models"
-import { resolveAgentModelChain } from "../src/pi-agent"
-import { authorizeAgentTool, PiAgentDriver } from "../src/pi-agent-driver"
+} from "../src/agent/agent-models"
+import { resolveAgentModelChain } from "../src/agent/pi-agent"
+import { authorizeAgentTool, PiAgentDriver } from "../src/agent/pi-agent-driver"
 
 test("模型链解析共用入口解析主模型、备用链与密钥配置", () => {
   const resolved = resolveAgentModelChain({

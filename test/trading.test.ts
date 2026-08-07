@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { calculatePortfolio } from "../src/portfolio"
-import { PaperTradingService, type TradeQuote } from "../src/trading"
+import { calculatePortfolio } from "../src/trading/portfolio"
+import { PaperTradingService, type TradeQuote } from "../src/trading/trading"
 
 const QUOTE: TradeQuote = {
   code: "SH600519",

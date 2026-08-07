@@ -1,11 +1,15 @@
 import { describe, expect, test } from "bun:test"
 import { stripVTControlCharacters } from "node:util"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { AgentController, type AgentDriver, type AgentDriverEvent } from "../src/agent-controller"
-import { MarketIntelligenceApp } from "../src/app"
-import { ANSI } from "../src/colors"
-import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news-data"
-import { PaperTradingService } from "../src/trading"
+import {
+  AgentController,
+  type AgentDriver,
+  type AgentDriverEvent,
+} from "../src/agent/agent-controller"
+import { MarketIntelligenceApp } from "../src/app/app"
+import { ANSI } from "../src/app/colors"
+import type { FinancialNewsSnapshot, NewsDataSource } from "../src/news/news-data"
+import { PaperTradingService } from "../src/trading/trading"
 
 function expectFrameFits(lines: readonly string[], width: number): void {
   for (const line of lines) {

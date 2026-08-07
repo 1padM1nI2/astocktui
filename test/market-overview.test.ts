@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { MarketOverviewService, type MarketOverviewSnapshot } from "../src/market-overview"
+import { MarketOverviewService, type MarketOverviewSnapshot } from "../src/market/market-overview"
 import {
   type MarketIndexQuoteClient,
   type MarketOverviewFetcher,
   PublicMarketOverviewDataSource,
-} from "../src/market-overview-source"
+} from "../src/market/market-overview-source"
 
 const INDEX_QUOTES = [
   {

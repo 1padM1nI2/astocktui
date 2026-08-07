@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import type { BacktestHttp } from "../src/backtest-data"
-import { createStrategy } from "../src/backtest-strategy"
-import { screenStocks } from "../src/stock-screen"
+import type { BacktestHttp } from "../src/backtest/backtest-data"
+import { createStrategy } from "../src/backtest/backtest-strategy"
+import { screenStocks } from "../src/backtest/stock-screen"
 
 function httpWith(closesByCode: Readonly<Record<string, readonly number[]>>): BacktestHttp {
   return {

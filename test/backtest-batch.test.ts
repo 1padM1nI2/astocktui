@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { type BatchBacktestHttp, renderBatchReport, runBatchBacktest } from "../src/backtest-batch"
-import { createStrategy } from "../src/backtest-strategy"
+import {
+  type BatchBacktestHttp,
+  renderBatchReport,
+  runBatchBacktest,
+} from "../src/backtest/backtest-batch"
+import { createStrategy } from "../src/backtest/backtest-strategy"
 
 function httpWith(closesByCode: Readonly<Record<string, readonly number[]>>): BatchBacktestHttp {
   return {

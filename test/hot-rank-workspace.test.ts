@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { ANSI } from "../src/colors"
+import { ANSI } from "../src/app/colors"
+import { ListScrollState } from "../src/app/workspace-scroll"
 import { HotRankWorkspace } from "../src/components/hot-rank"
-import type { HotRankSnapshot } from "../src/eastmoney-hot-rank"
-import { ListScrollState } from "../src/workspace-scroll"
+import type { HotRankSnapshot } from "../src/market/eastmoney-hot-rank"
 
 const SNAPSHOT: HotRankSnapshot = {
   items: [

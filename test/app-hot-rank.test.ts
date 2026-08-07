@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test"
-import { AgentController, type AgentDriver, type AgentDriverEvent } from "../src/agent-controller"
-import { MarketIntelligenceApp } from "../src/app"
-import type { CommandContext } from "../src/commands"
-import type { HotRankSnapshot } from "../src/eastmoney-hot-rank"
-import type { MarketDataSource, MarketSnapshot } from "../src/market-data"
+import {
+  AgentController,
+  type AgentDriver,
+  type AgentDriverEvent,
+} from "../src/agent/agent-controller"
+import { MarketIntelligenceApp } from "../src/app/app"
+import type { CommandContext } from "../src/commands/commands"
+import type { HotRankSnapshot } from "../src/market/eastmoney-hot-rank"
+import type { MarketDataSource, MarketSnapshot } from "../src/market/market-data"
 
 const MARKET_SNAPSHOT: MarketSnapshot = {
   quotes: [

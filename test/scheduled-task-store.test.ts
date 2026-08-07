@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { type ScheduledTaskState, ScheduledTaskStore } from "../src/scheduled-task-store"
+import { type ScheduledTaskState, ScheduledTaskStore } from "../src/agent/scheduled-task-store"
 
 function fixture(): { readonly directory: string; readonly path: string } {
   const directory = mkdtempSync(join(tmpdir(), "astocktui-scheduled-tasks-"))

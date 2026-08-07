@@ -4,8 +4,8 @@ import {
   type ProviderHealth,
   ResilientStockApiClient,
   type StockApiProvider,
-} from "../src/resilient-stock-api"
-import type { StockApiKline, StockApiQuote } from "../src/stock-api-types"
+} from "../src/market/resilient-stock-api"
+import type { StockApiKline, StockApiQuote } from "../src/market/stock-api-types"
 
 function quote(code: string, source: string): StockApiQuote {
   return {

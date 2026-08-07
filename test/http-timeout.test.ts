@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { withTimeout } from "../src/http-timeout"
+import { withTimeout } from "../src/infra/http-timeout"
 
 describe("withTimeout", () => {
   test("按时 resolve 时透传原值", async () => {

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { isAshareCode, normalizeMarketCode, parseMarketCode } from "../src/market-code"
+import { isAshareCode, normalizeMarketCode, parseMarketCode } from "../src/market/market-code"
 
 test("规范化 A 股、美股、日本和韩国股票代码并映射腾讯 ticker", () => {
   expect(normalizeMarketCode("600519")).toBe("SH600519")

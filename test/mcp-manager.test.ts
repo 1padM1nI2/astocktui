@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { McpServerConfig } from "../src/agent-extension-types"
+import type { McpServerConfig } from "../src/agent/agent-extension-types"
 import { type McpConnector, McpManager } from "../src/mcp/manager"
 
 function config(name: string): McpServerConfig {

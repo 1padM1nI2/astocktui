@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { ToolCallLogger } from "../src/tool-call-log"
+import { ToolCallLogger } from "../src/agent/tool-call-log"
 
 function tempDir(): string {
   return mkdtempSync(join(tmpdir(), "astocktui-tool-call-log-"))

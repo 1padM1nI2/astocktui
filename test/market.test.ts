@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { stripVTControlCharacters } from "node:util"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { ANSI } from "../src/colors"
+import { ANSI } from "../src/app/colors"
 import { MarketWorkspace } from "../src/components/market"
-import type { MarketSnapshot } from "../src/market-data"
+import type { MarketSnapshot } from "../src/market/market-data"
 
 function visibleTokenStart(line: string, token: string): number {
   const index = line.indexOf(token)

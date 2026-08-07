@@ -2,10 +2,10 @@ import { expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { AgentSystemEvent } from "../src/agent-event-dispatcher"
-import type { RefreshScheduler } from "../src/auto-refresh"
-import { ScheduledTaskService } from "../src/scheduled-task-service"
-import { ScheduledTaskStore } from "../src/scheduled-task-store"
+import type { AgentSystemEvent } from "../src/agent/agent-event-dispatcher"
+import { ScheduledTaskService } from "../src/agent/scheduled-task-service"
+import { ScheduledTaskStore } from "../src/agent/scheduled-task-store"
+import type { RefreshScheduler } from "../src/app/auto-refresh"
 
 let now = new Date("2026-07-20T00:44:00.000Z")
 

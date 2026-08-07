@@ -4,7 +4,7 @@ import {
   eastmoneyDailySecid,
   fetchDailyKlines,
   parseDailyKlines,
-} from "../src/backtest-data"
+} from "../src/backtest/backtest-data"
 
 function klineLine(
   date: string,

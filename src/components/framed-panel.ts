@@ -1,7 +1,7 @@
 import type { BoxBorder, Component } from "@oh-my-pi/pi-tui"
 import { Box, visibleWidth } from "@oh-my-pi/pi-tui"
-import { ANSI } from "../colors"
-import { fitLine } from "../width"
+import { ANSI } from "../app/colors"
+import { fitLine } from "../app/width"
 
 export type PanelTone = "muted" | "accent"
 

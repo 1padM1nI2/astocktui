@@ -3,12 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { AgentTool } from "@oh-my-pi/pi-agent-core"
-import { AUTOMATION_COMMANDS } from "../src/automation-commands"
-import type { CommandContext, CommandResult } from "../src/commands"
-import { createConditionAgentTools } from "../src/condition-agent-tools"
-import { ConditionalOrderService } from "../src/conditional-order-service"
-import { ConditionalOrderStore } from "../src/conditional-order-store"
-import type { MarketSnapshot } from "../src/market-data"
+import { createConditionAgentTools } from "../src/agent/condition-agent-tools"
+import { AUTOMATION_COMMANDS } from "../src/commands/automation-commands"
+import type { CommandContext, CommandResult } from "../src/commands/commands"
+import type { MarketSnapshot } from "../src/market/market-data"
+import { ConditionalOrderService } from "../src/trading/conditional-order-service"
+import { ConditionalOrderStore } from "../src/trading/conditional-order-store"
 
 const NOW = new Date("2026-07-21T01:30:00.000Z") // 周二 09:30（上海）
 

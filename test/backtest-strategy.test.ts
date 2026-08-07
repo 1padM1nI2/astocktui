@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { createStrategy, listStrategies } from "../src/backtest-strategy"
-import type { KlineBar } from "../src/market-data"
+import { createStrategy, listStrategies } from "../src/backtest/backtest-strategy"
+import type { KlineBar } from "../src/market/market-data"
 
 function bars(closes: readonly number[]): KlineBar[] {
   return closes.map((close, index) => ({

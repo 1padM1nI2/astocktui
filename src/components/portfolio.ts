@@ -1,10 +1,10 @@
 import type { Component } from "@oh-my-pi/pi-tui"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { ANSI } from "../colors"
-import type { PortfolioSnapshot } from "../portfolio"
-import { calculatePortfolio, EMPTY_PORTFOLIO } from "../portfolio"
-import { alignCell, fitLine } from "../width"
-import { ListScrollState } from "../workspace-scroll"
+import { ANSI } from "../app/colors"
+import { alignCell, fitLine } from "../app/width"
+import { ListScrollState } from "../app/workspace-scroll"
+import type { PortfolioSnapshot } from "../trading/portfolio"
+import { calculatePortfolio, EMPTY_PORTFOLIO } from "../trading/portfolio"
 
 const MONEY_FORMATTER = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,

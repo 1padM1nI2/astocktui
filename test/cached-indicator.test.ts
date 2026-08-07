@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
 import { MarketWorkspace } from "../src/components/market"
 import { NewsWorkspace } from "../src/components/news"
-import type { MarketSnapshot } from "../src/market-data"
-import type { FinancialNewsSnapshot } from "../src/news-data"
+import type { MarketSnapshot } from "../src/market/market-data"
+import type { FinancialNewsSnapshot } from "../src/news/news-data"
 
 const MARKET_SNAPSHOT: MarketSnapshot = {
   quotes: [

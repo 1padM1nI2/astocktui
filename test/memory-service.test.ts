@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { MEMORY_CONTENT_MAX } from "../src/memory"
-import { MemoryService } from "../src/memory-service"
-import { MemoryStore } from "../src/memory-store"
-import type { SimulatedTrade } from "../src/trading-types"
+import { MEMORY_CONTENT_MAX } from "../src/agent/memory"
+import { MemoryService } from "../src/agent/memory-service"
+import { MemoryStore } from "../src/agent/memory-store"
+import type { SimulatedTrade } from "../src/trading/trading-types"
 
 const NOW = new Date("2026-07-16T08:00:00.000Z")
 

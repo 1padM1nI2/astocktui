@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { readCache, writeCache } from "../src/disk-cache"
+import { readCache, writeCache } from "../src/infra/disk-cache"
 
 function tempPath(name = "cache.json"): string {
   return join(mkdtempSync(join(tmpdir(), "astocktui-disk-cache-")), name)

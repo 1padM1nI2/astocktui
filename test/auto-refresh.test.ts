@@ -4,7 +4,7 @@ import {
   MARKET_REFRESH_INTERVAL_MS,
   NEWS_REFRESH_INTERVAL_MS,
   type RefreshScheduler,
-} from "../src/auto-refresh"
+} from "../src/app/auto-refresh"
 
 describe("自动定时刷新", () => {
   test("启动时立即刷新并按独立周期刷新行情和新闻", () => {

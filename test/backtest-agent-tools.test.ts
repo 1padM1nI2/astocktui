@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { type BacktestToolContext, createBacktestAgentTools } from "../src/backtest-agent-tools"
-import type { BacktestHttp } from "../src/backtest-data"
+import {
+  type BacktestToolContext,
+  createBacktestAgentTools,
+} from "../src/agent/backtest-agent-tools"
+import type { BacktestHttp } from "../src/backtest/backtest-data"
 
 function httpWith(closesByCode: Readonly<Record<string, readonly number[]>>): BacktestHttp {
   return {

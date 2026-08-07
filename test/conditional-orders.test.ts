@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test"
-import { evaluateConditionalOrders, validateConditionalOrder } from "../src/conditional-orders"
+import {
+  evaluateConditionalOrders,
+  validateConditionalOrder,
+} from "../src/trading/conditional-orders"
 
 test("价格条件触发一次且不会重复", () => {
   const now = new Date("2026-07-20T01:30:00.000Z")

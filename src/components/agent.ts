@@ -1,11 +1,11 @@
 import type { Component } from "@oh-my-pi/pi-tui"
 import { visibleWidth, wrapTextWithAnsi } from "@oh-my-pi/pi-tui"
-import { EMPTY_AGENT_SESSION, renderAgentBody } from "../agent-body"
-import type { AgentSessionView } from "../agent-controller"
-import { ANSI } from "../colors"
-import type { CommandPromptView } from "../command-prompt"
-import type { ScheduledTaskSummary } from "../scheduled-task-service"
-import { fitLine } from "../width"
+import { EMPTY_AGENT_SESSION, renderAgentBody } from "../agent/agent-body"
+import type { AgentSessionView } from "../agent/agent-controller"
+import type { ScheduledTaskSummary } from "../agent/scheduled-task-service"
+import { ANSI } from "../app/colors"
+import { fitLine } from "../app/width"
+import type { CommandPromptView } from "../commands/command-prompt"
 import { renderFramedPanel } from "./framed-panel"
 
 const DEFAULT_HEIGHT = 15

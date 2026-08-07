@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import type { McpServerConfig } from "../src/agent-extension-types"
+import type { McpServerConfig } from "../src/agent/agent-extension-types"
 import type { McpServerConnection } from "../src/mcp/manager"
 import { bridgeMcpTools, sanitizeMcpToolName } from "../src/mcp/tool-bridge"
 

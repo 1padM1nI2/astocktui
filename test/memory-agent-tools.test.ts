@@ -3,10 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { AgentTool } from "@oh-my-pi/pi-agent-core"
-import type { CommandContext } from "../src/commands"
-import { createMemoryAgentTools } from "../src/memory-agent-tools"
-import { MemoryService } from "../src/memory-service"
-import { MemoryStore } from "../src/memory-store"
+import { createMemoryAgentTools } from "../src/agent/memory-agent-tools"
+import { MemoryService } from "../src/agent/memory-service"
+import { MemoryStore } from "../src/agent/memory-store"
+import type { CommandContext } from "../src/commands/commands"
 
 const NOW = new Date("2026-07-16T08:00:00.000Z")
 

@@ -5,7 +5,7 @@ import {
   isContinuousAuction,
   parseShanghaiTimeMinutes,
   shanghaiDateTime,
-} from "../src/trading-calendar"
+} from "../src/trading/trading-calendar"
 
 const at = (value: string): Date => new Date(value)
 

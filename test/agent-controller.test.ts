@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { AgentController, type AgentDriver, type AgentDriverEvent } from "../src/agent-controller"
+import {
+  AgentController,
+  type AgentDriver,
+  type AgentDriverEvent,
+} from "../src/agent/agent-controller"
 
 class FakeAgentDriver implements AgentDriver {
   readonly prompts: string[] = []

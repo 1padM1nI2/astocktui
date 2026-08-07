@@ -3,13 +3,17 @@ import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { AgentController, type AgentDriver, type AgentDriverEvent } from "../src/agent-controller"
-import type { McpServerConfig, McpServerStatus } from "../src/agent-extension-types"
-import { AgentExtensionRuntime, type McpManagerFactory } from "../src/agent-extensions"
-import { MarketIntelligenceApp } from "../src/app"
+import {
+  AgentController,
+  type AgentDriver,
+  type AgentDriverEvent,
+} from "../src/agent/agent-controller"
+import type { McpServerConfig, McpServerStatus } from "../src/agent/agent-extension-types"
+import { AgentExtensionRuntime, type McpManagerFactory } from "../src/agent/agent-extensions"
+import { type DiscoveredSkill, SkillRegistry } from "../src/agent/skills"
+import { MarketIntelligenceApp } from "../src/app/app"
 import { loadMcpConfigs } from "../src/mcp/config"
 import type { McpServerConnection } from "../src/mcp/manager"
-import { type DiscoveredSkill, SkillRegistry } from "../src/skills"
 
 const skill: DiscoveredSkill = {
   name: "valuation",

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { acquireInstanceLock } from "../src/instance-lock"
+import { acquireInstanceLock } from "../src/app/instance-lock"
 
 function fixture(): { readonly directory: string; readonly path: string } {
   const directory = mkdtempSync(join(tmpdir(), "astocktui-instance-lock-"))

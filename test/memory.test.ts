@@ -10,8 +10,8 @@ import {
   renderMemoryPrompt,
   replaceMemoryEntries,
   syncTradeEvaluations,
-} from "../src/memory"
-import type { SimulatedTrade } from "../src/trading-types"
+} from "../src/agent/memory"
+import type { SimulatedTrade } from "../src/trading/trading-types"
 
 const NOW = new Date("2026-07-16T08:00:00.000Z")
 const now = () => NOW

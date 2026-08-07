@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { stripVTControlCharacters } from "node:util"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { alignCell, fitLine, wrapText } from "../src/width"
+import { alignCell, fitLine, wrapText } from "../src/app/width"
 
 test("将混合中文与 ANSI 的行情文本裁切到给定列宽", () => {
   // Given

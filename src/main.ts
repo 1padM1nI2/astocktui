@@ -1,12 +1,12 @@
 import { ProcessTerminal, TUI } from "@oh-my-pi/pi-tui"
-import { MarketIntelligenceApp } from "./app"
-import { acquireInstanceLock } from "./instance-lock"
-import type { MarketDataSource } from "./market-data"
-import type { NewsDataSource } from "./news-data"
-import { createPersistentPaperTradingService } from "./paper-account-store"
-import { PaperTradingService } from "./trading"
-import { WatchlistService } from "./watchlist"
-import { createPersistentWatchlistService } from "./watchlist-store"
+import { MarketIntelligenceApp } from "./app/app"
+import { acquireInstanceLock } from "./app/instance-lock"
+import type { MarketDataSource } from "./market/market-data"
+import type { NewsDataSource } from "./news/news-data"
+import { createPersistentPaperTradingService } from "./trading/paper-account-store"
+import { PaperTradingService } from "./trading/trading"
+import { WatchlistService } from "./trading/watchlist"
+import { createPersistentWatchlistService } from "./trading/watchlist-store"
 
 export function createDemo(
   tui: TUI,

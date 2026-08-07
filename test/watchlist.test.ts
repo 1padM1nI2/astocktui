@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { WatchlistService } from "../src/watchlist"
+import { WatchlistService } from "../src/trading/watchlist"
 
 describe("行情自选股服务", () => {
   test("默认列表支持代码规范化、添加、去重和删除", () => {

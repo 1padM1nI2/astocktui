@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { CommandContext } from "../src/commands"
-import { RESEARCH_SYSTEM_PROMPT, runResearchTask } from "../src/research-agent"
+import { RESEARCH_SYSTEM_PROMPT, runResearchTask } from "../src/agent/research-agent"
+import type { CommandContext } from "../src/commands/commands"
 
 const context = undefined as unknown as CommandContext
 

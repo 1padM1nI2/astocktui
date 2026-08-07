@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { ListScrollState } from "../src/workspace-scroll"
+import { ListScrollState } from "../src/app/workspace-scroll"
 
 describe("工作区列表滚动", () => {
   test("上下键移动偏移并在边界夹紧", () => {

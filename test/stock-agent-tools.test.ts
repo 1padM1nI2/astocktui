@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import type { AgentTool } from "@oh-my-pi/pi-agent-core"
-import { createStockAgentTools, type StockToolContext } from "../src/stock-agent-tools"
-import type { StockDetail } from "../src/stock-detail"
-import type { StockSearchMatch } from "../src/stock-search"
-import type { TradeQuote } from "../src/trading"
+import { createStockAgentTools, type StockToolContext } from "../src/agent/stock-agent-tools"
+import type { StockDetail } from "../src/market/stock-detail"
+import type { StockSearchMatch } from "../src/market/stock-search"
+import type { TradeQuote } from "../src/trading/trading"
 
 const QUOTE: TradeQuote = { code: "SH600519", name: "贵州茅台", price: 1688 }
 

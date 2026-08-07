@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
 import { stripVTControlCharacters } from "node:util"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
-import { ANSI } from "../src/colors"
+import { ANSI } from "../src/app/colors"
 import { TradeHistoryWorkspace } from "../src/components/trade-history"
-import { PaperTradingService } from "../src/trading"
+import { PaperTradingService } from "../src/trading/trading"
 
 const QUOTE = { code: "SH600519", name: "贵州茅台", price: 10 }
 

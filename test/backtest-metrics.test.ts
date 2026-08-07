@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { BacktestResult, BacktestTrade, EquityPoint } from "../src/backtest-engine"
-import { computeMetrics } from "../src/backtest-metrics"
+import type { BacktestResult, BacktestTrade, EquityPoint } from "../src/backtest/backtest-engine"
+import { computeMetrics } from "../src/backtest/backtest-metrics"
 
 function resultOf(
   equities: readonly number[],
