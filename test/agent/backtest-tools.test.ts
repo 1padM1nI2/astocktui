@@ -142,4 +142,22 @@ describe("screen_stocks", () => {
     expect(details.source).toBe("hot")
     expect(details.hits.map((hit) => hit.code)).toEqual(["SH600519"])
   })
+
+  test("conditions 条件组合模式按 AND 筛选", async () => {
+    const details = (await run("screen_stocks", {
+      conditions: ["above_ma(period=3)", "pct_up(min=5)"],
+    })) as {
+      mode: string
+      hits: { code: string }[]
+      misses: string[]
+    }
+    expect(details.mode).toBe("conditions")
+    // httpTrend：SH600519 末日 15 > 3 日均线且涨幅 7.1%；SZ000001 持续下跌不满足
+    expect(details.hits.map((hit) => hit.code)).toEqual(["SH600519"])
+    expect(details.misses).toEqual(["SZ000001"])
+  })
+
+  test("未知条件抛出错误并列出可选项", async () => {
+    await expect(run("screen_stocks", { conditions: ["nope"] })).rejects.toThrow("rsi_oversold")
+  })
 })

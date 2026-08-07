@@ -89,8 +89,9 @@ Rules: color is semantic, never decorative. Each rendered line closes ANSI styli
 - Data: 前复权（fqt=1）保证分红拆股后均线信号不断裂；网络或 HTTP 错误转为明确的失败输出，历史数据少于策略预热期加两根时报数据不足。
 
 ### ScreenCommand
-- Scope: `/screen [策略] [参数=值 …] [source=watch|hot]` 按策略信号选股：扫描自选股（默认）或股吧人气榜（前 50 只），报告最新交易日产生买入或卖出信号的标的。
-- Output: 买入信号（红）与卖出信号（绿）分组列出代码、收盘价与信号日期，附无信号与失败统计；失败标的逐行给出原因（最多三条）。
+- Scope: `/screen [策略|条件(参数) …] [参数=值 …] [source=watch|hot]` 按策略信号或条件组合选股：扫描自选股（默认）或股吧人气榜（前 50 只）。策略模式报告最新交易日的买入/卖出信号；条件模式按 AND 语义报告同时满足全部条件的标的。
+- Conditions: `rsi_oversold`、`rsi_overbought`、`above_ma`、`below_ma`、`ma_golden`、`ma_dead`、`breakout_high`、`breakout_low`、`volume_surge`、`pct_up`、`pct_down`，各带参数（如 `above_ma(period=20)`、`volume_surge(period=5,ratio=2)`），内联传递；条件模式拒绝独立的策略参数键。
+- Output: 策略模式买入（红）/卖出（绿）分组列出代码、收盘价与信号日期；条件模式列出满足条件的标的与收盘价；两者均附无信号/未满足与失败统计，失败标的逐行给出原因（最多三条）。
 
 ### BacktestAgentTools
 - Tools: `run_backtest`（单只回测，返回区间、指标与最近十笔成交）、`batch_backtest`（多只或自选股批量回测，按总收益降序返回结构化行）、`screen_stocks`（按策略信号扫描自选股或热榜，返回 hits/quiet/failures 分组）；三者与 `/backtest`、`/screen` 命令共用同一数据、策略、引擎与筛选模块，均为只读 approval。

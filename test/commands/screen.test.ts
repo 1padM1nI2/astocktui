@@ -21,15 +21,44 @@ function httpWith(closesByCode: Readonly<Record<string, readonly number[]>>): Ba
 
 describe("parseScreenArgs", () => {
   test("默认 ma-cross 策略与 watch 来源", () => {
-    expect(parseScreenArgs([])).toEqual({ strategyName: "ma-cross", params: {}, source: "watch" })
+    expect(parseScreenArgs([])).toEqual({
+      mode: "strategy",
+      strategyName: "ma-cross",
+      params: {},
+      source: "watch",
+    })
   })
 
   test("解析策略、参数与来源", () => {
     expect(parseScreenArgs(["rsi", "period=10", "source=hot"])).toEqual({
+      mode: "strategy",
       strategyName: "rsi",
       params: { period: 10 },
       source: "hot",
     })
+  })
+
+  test("条件组合模式：多个条件带内联参数", () => {
+    const parsed = parseScreenArgs([
+      "rsi_oversold(period=10,threshold=25)",
+      "above_ma",
+      "source=hot",
+    ])
+    expect(parsed).toMatchObject({ mode: "conditions", source: "hot" })
+    if ("error" in parsed || parsed.mode !== "conditions") throw new Error("解析失败")
+    expect(parsed.conditions.map((condition) => condition.name)).toEqual([
+      "rsi_oversold",
+      "above_ma",
+    ])
+  })
+
+  test("单个条件名也走条件模式", () => {
+    const parsed = parseScreenArgs(["pct_up"])
+    expect(parsed).toHaveProperty("mode", "conditions")
+  })
+
+  test("条件模式拒绝独立的策略参数键", () => {
+    expect(parseScreenArgs(["above_ma", "period=10"])).toHaveProperty("error")
   })
 
   test("拒绝非法来源与未知参数", () => {
@@ -93,5 +122,20 @@ describe("/screen 命令", () => {
     const result = await command.execute(context, ["nope"])
     expect(result.title).toBe("选股失败")
     expect(result.lines.join("\n")).toContain("ma-cross")
+  })
+
+  test("条件组合模式输出入选与未满足统计", async () => {
+    const condHttp = httpWith({
+      SH600519: [10, 10, 13],
+      SZ000001: [10, 10, 10.4],
+      SZ300750: [10, 10, 9],
+    })
+    const injected = createScreenCommands(condHttp)[0]
+    if (injected === undefined) throw new Error("命令未注册")
+    const result = await injected.execute(context, ["pct_up(min=5)"])
+    expect(result.title).toContain("条件")
+    const text = result.lines.join("\n")
+    expect(text).toContain("SH600519")
+    expect(text).toContain("未满足 2 只")
   })
 })

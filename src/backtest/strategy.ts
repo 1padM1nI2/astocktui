@@ -41,7 +41,7 @@ function validParams(
 }
 
 /** 简单移动平均；数据不足的窗口返回 NaN */
-function sma(closes: readonly number[], period: number, index: number): number {
+export function computeSma(closes: readonly number[], period: number, index: number): number {
   if (index + 1 < period) return Number.NaN
   let sum = 0
   for (let i = index - period + 1; i <= index; i++) sum += closes[i] ?? 0
@@ -88,10 +88,10 @@ const DEFINITIONS: readonly StrategyDefinition[] = [
         decide(bars, index, holding) {
           if (index < slow) return null
           const closes = bars.map((bar) => bar.close)
-          const fastNow = sma(closes, fast, index)
-          const slowNow = sma(closes, slow, index)
-          const fastPrev = sma(closes, fast, index - 1)
-          const slowPrev = sma(closes, slow, index - 1)
+          const fastNow = computeSma(closes, fast, index)
+          const slowNow = computeSma(closes, slow, index)
+          const fastPrev = computeSma(closes, fast, index - 1)
+          const slowPrev = computeSma(closes, slow, index - 1)
           if (!holding && fastPrev <= slowPrev && fastNow > slowNow) return "buy"
           if (holding && fastPrev >= slowPrev && fastNow < slowNow) return "sell"
           return null

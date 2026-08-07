@@ -1,10 +1,11 @@
 import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
 import { runBatchBacktest } from "../backtest/batch"
+import { createCondition, parseConditionSpecs } from "../backtest/conditions"
 import { type BacktestHttp, fetchDailyKlines } from "../backtest/data"
 import { runBacktest } from "../backtest/engine"
 import { computeMetrics } from "../backtest/metrics"
-import { screenStocks } from "../backtest/screen"
+import { screenByConditions, screenStocks } from "../backtest/screen"
 import { createStrategy, listStrategies } from "../backtest/strategy"
 import { isAshareCode, normalizeMarketCode } from "../market/code"
 import type { HotRankSnapshot } from "../market/eastmoney-hot-rank"
@@ -160,17 +161,20 @@ export function createBacktestAgentTools(
       name: "screen_stocks",
       label: "策略选股",
       description:
-        "按策略信号选股：扫描自选股（source=watchlist）或股吧人气榜（source=hot），返回最新交易日产生买入或卖出信号的股票。买入信号在前，quiet 为无信号，failures 为数据获取失败。",
+        "按策略信号或条件组合选股：扫描自选股（source=watchlist）或股吧人气榜（source=hot）。传 strategy 时返回最新交易日的买入/卖出信号（买入在前，quiet 无信号）；传 conditions 时按 AND 语义返回同时满足全部条件的标的（misses 为未满足）。conditions 元素格式 name 或 name(key=value,…)，如 above_ma(period=20)、rsi_oversold(period=14,threshold=30)、volume_surge(period=5,ratio=2)、pct_up(min=5)、ma_golden(fast=5,slow=20)、breakout_high(period=20) 等，可用 list 见错误提示。failures 为数据获取失败。",
       parameters: z.object({
         strategy: strategySchema.optional(),
         params: paramsSchema,
         source: z.enum(["watchlist", "hot"]).optional(),
+        conditions: z.array(z.string().min(1)).min(1).optional(),
       }),
       intent: "omit",
       approval: "read",
       execute: async (_id, params) => {
-        const input = params as StrategyInput & { readonly source?: "watchlist" | "hot" }
-        const strategy = resolveStrategy(input)
+        const input = params as StrategyInput & {
+          readonly source?: "watchlist" | "hot"
+          readonly conditions?: readonly string[]
+        }
         const source = input.source ?? "watchlist"
         let codes: readonly string[]
         if (source === "hot") {
@@ -181,8 +185,29 @@ export function createBacktestAgentTools(
           codes = context.watchlist()
         }
         if (codes.length === 0) throw new Error("自选股为空，无可扫描标的")
+        if (input.conditions !== undefined && input.conditions.length > 0) {
+          const specs = parseConditionSpecs(input.conditions)
+          if ("error" in specs) throw new Error(specs.error)
+          const conditions = specs.map((spec) => {
+            const condition = createCondition(spec.name, spec.params)
+            if (condition === null) throw new Error(`条件创建失败：${spec.name}`)
+            return condition
+          })
+          const result = await screenByConditions(http, HTTP_TIMEOUT_MS, codes, conditions)
+          return jsonResult({
+            mode: "conditions",
+            conditions: conditions.map((condition) => condition.summary),
+            source,
+            scanned: codes.length,
+            hits: result.hits,
+            misses: result.misses,
+            failures: result.failures,
+          })
+        }
+        const strategy = resolveStrategy(input)
         const result = await screenStocks(http, HTTP_TIMEOUT_MS, codes, strategy)
         return jsonResult({
+          mode: "strategy",
           strategy: strategy.name,
           strategySummary: strategy.summary,
           source,
