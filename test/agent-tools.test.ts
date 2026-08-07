@@ -201,6 +201,9 @@ describe("AStock Pi Agent 工具", () => {
       "replace_memories",
       "search_stock",
       "get_stock_detail",
+      "run_backtest",
+      "batch_backtest",
+      "screen_stocks",
     ])
   })
 

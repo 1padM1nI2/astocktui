@@ -1,10 +1,12 @@
 import { AUTOMATION_COMMANDS } from "./automation-commands"
+import { BACKTEST_COMMANDS } from "./backtest-commands"
 import { ANSI } from "./colors"
 import type { CommandContext, DataStatus, WorkspaceName } from "./command-context"
 import { MEMORY_COMMANDS } from "./memory-commands"
 import { MODEL_COMMANDS } from "./model-commands"
 import { calculatePortfolio } from "./portfolio"
 import { QUOTE_COMMANDS } from "./quote-commands"
+import { SCREEN_COMMANDS } from "./screen-commands"
 import { TASK_COMMANDS } from "./task-commands"
 import { TRADING_COMMANDS } from "./trading-commands"
 import { WATCHLIST_COMMANDS } from "./watchlist-commands"
@@ -195,6 +197,8 @@ export const APP_COMMANDS: readonly AppCommand[] = [
     execute: portfolioCommand,
   },
   ...TRADING_COMMANDS,
+  ...BACKTEST_COMMANDS,
+  ...SCREEN_COMMANDS,
   {
     name: "mcp",
     aliases: [],

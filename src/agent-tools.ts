@@ -1,5 +1,6 @@
 import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
+import { createBacktestAgentTools } from "./backtest-agent-tools"
 import type { CommandContext, RefreshTarget, WorkspaceName } from "./commands"
 import { createConditionAgentTools } from "./condition-agent-tools"
 import { createFileAgentTools } from "./file-agent-tools"
@@ -278,5 +279,6 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
     ...createScheduledTaskAgentTools(context),
     ...createMemoryAgentTools(context),
     ...createStockAgentTools(context),
+    ...createBacktestAgentTools(context),
   ]
 }
