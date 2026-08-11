@@ -66,6 +66,8 @@ export function resolveModelChain(options: {
   readonly modelId: string
   readonly baseUrl?: string | undefined
   readonly fallbackSpecs: readonly FallbackModelSpec[]
+  /** 按 provider 的备用模型端点覆盖；非法 URL 返回错误而不是静默回退官方端点 */
+  readonly fallbackBaseUrls?: Readonly<Record<string, string>> | undefined
 }): ResolvedModelChain {
   const label = `${options.provider}/${options.modelId}`
   const bundled = getBundledModel(options.provider as GeneratedProvider, options.modelId)
@@ -81,9 +83,20 @@ export function resolveModelChain(options: {
     if (spec.provider === options.provider && spec.model === options.modelId) continue
     const fallback = getBundledModel(spec.provider as GeneratedProvider, spec.model)
     if (fallback === undefined) continue
-    chain.push({ model: fallback, label: `${spec.provider}/${spec.model}` })
+    let model: typeof fallback
+    try {
+      model = withAgentBaseUrl(fallback, options.fallbackBaseUrls?.[spec.provider])
+    } catch (error) {
+      return { chain: [], error: error instanceof Error ? error.message : String(error) }
+    }
+    chain.push({ model, label: `${spec.provider}/${spec.model}` })
   }
   return { chain, error: null }
+}
+
+/** provider 专属端点环境变量：ASTOCK_AGENT_BASE_URL_<PROVIDER>（provider 大写、非字母数字转下划线） */
+export function providerBaseUrlEnvName(provider: string): string {
+  return `ASTOCK_AGENT_BASE_URL_${provider.toUpperCase().replace(/[^A-Z0-9]/gu, "_")}`
 }
 
 /** 额度回退后重新尝试主模型的间隔（额度通常按数小时窗口重置） */

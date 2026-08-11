@@ -5,6 +5,7 @@ import {
   isContextOverflowError,
   isQuotaExhaustedError,
   parseFallbackModelList,
+  resolveModelChain,
   withAgentBaseUrl,
 } from "../../src/agent/models"
 import { resolveAgentModelChain } from "../../src/agent/pi-agent"
@@ -68,6 +69,71 @@ test("自定义 Base URL 覆盖模型端点且不修改模型目录对象", () =
   expect(configured.baseUrl).toBe("https://gateway.example.com/v1")
   expect(bundled.baseUrl).toBe("https://api.openai.com/v1")
   expect(() => withAgentBaseUrl(bundled, "not-a-url")).toThrow("Base URL")
+})
+
+test("备用模型按 provider 应用独立 Base URL，主模型不受他人覆盖影响", () => {
+  const resolved = resolveModelChain({
+    provider: "deepseek",
+    modelId: "deepseek-v4-pro",
+    fallbackSpecs: [{ provider: "openai", model: "gpt-4o-mini" }],
+    fallbackBaseUrls: { openai: "https://oai-proxy.example.com/v1/" },
+  })
+  expect(resolved.error).toBeNull()
+  expect(resolved.chain[0]?.model.baseUrl).toBe("https://api.deepseek.com")
+  expect(resolved.chain[1]?.model.baseUrl).toBe("https://oai-proxy.example.com/v1")
+})
+
+test("备用模型的非法 Base URL 返回错误而不是静默回退官方端点", () => {
+  const resolved = resolveModelChain({
+    provider: "deepseek",
+    modelId: "deepseek-v4-pro",
+    fallbackSpecs: [{ provider: "openai", model: "gpt-4o-mini" }],
+    fallbackBaseUrls: { openai: "not-a-url" },
+  })
+  expect(resolved.chain).toEqual([])
+  expect(resolved.error).toContain("Base URL")
+})
+
+test("ASTOCK_AGENT_BASE_URL_<PROVIDER> 优先于全局覆盖且不泄漏给其他 provider", () => {
+  process.env["ASTOCK_AGENT_BASE_URL_DEEPSEEK"] = "https://ds-proxy.example.com/v1"
+  process.env["ASTOCK_AGENT_BASE_URL"] = "https://global.example.com/v1"
+  try {
+    const resolved = resolveAgentModelChain({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      apiKey: "sk-test",
+      fallbackModels: ["openai/gpt-4o-mini"],
+    })
+    expect(resolved.error).toBeNull()
+    expect(resolved.chain[0]?.model.baseUrl).toBe("https://ds-proxy.example.com/v1")
+    expect(resolved.chain[1]?.model.baseUrl).toBe("https://api.openai.com/v1")
+  } finally {
+    delete process.env["ASTOCK_AGENT_BASE_URL_DEEPSEEK"]
+    delete process.env["ASTOCK_AGENT_BASE_URL"]
+  }
+})
+
+test("主模型未设专属变量时退回全局覆盖，openai 备用链读 OPENAI_BASE_URL", () => {
+  process.env["ASTOCK_AGENT_BASE_URL"] = "https://global.example.com/v1"
+  process.env["OPENAI_BASE_URL"] = "https://oai-legacy.example.com/v1"
+  try {
+    const globalOnly = resolveAgentModelChain({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      apiKey: "sk-test",
+    })
+    expect(globalOnly.chain[0]?.model.baseUrl).toBe("https://global.example.com/v1")
+    const fallback = resolveAgentModelChain({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      apiKey: "sk-test",
+      fallbackModels: ["openai/gpt-4o-mini"],
+    })
+    expect(fallback.chain[1]?.model.baseUrl).toBe("https://oai-legacy.example.com/v1")
+  } finally {
+    delete process.env["ASTOCK_AGENT_BASE_URL"]
+    delete process.env["OPENAI_BASE_URL"]
+  }
 })
 
 test("解析备用模型列表，忽略无效条目", () => {
