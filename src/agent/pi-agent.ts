@@ -5,7 +5,12 @@ import { AgentController, type AgentDriver } from "./controller"
 import type { AgentExtensionRuntime } from "./extensions"
 import { messagesToExchanges } from "./history"
 import { createMcpAgentTools } from "./mcp-tools"
-import { type AgentModelOption, parseFallbackModelList, resolveModelChain } from "./models"
+import {
+  type AgentModelOption,
+  parseFallbackModelList,
+  providerBaseUrlEnvName,
+  resolveModelChain,
+} from "./models"
 import { PiAgentDriver, SYSTEM_PROMPT } from "./pi-agent-driver"
 import { AgentSessionStore } from "./session-store"
 import { ToolCallLogger } from "./tool-call-log"
@@ -42,19 +47,27 @@ export interface AgentModelChainResolution {
 export function resolveAgentModelChain(config: PiAgentConfig = {}): AgentModelChainResolution {
   const provider = config.provider ?? configuredValue("ASTOCK_AGENT_PROVIDER") ?? "openai"
   const modelId = config.model ?? configuredValue("ASTOCK_AGENT_MODEL") ?? "gpt-4o-mini"
-  const configuredBaseUrl =
-    config.baseUrl ??
-    configuredValue("ASTOCK_AGENT_BASE_URL") ??
-    (provider === "openai" ? configuredValue("OPENAI_BASE_URL") : undefined)
   const fallbackSpecs =
     config.fallbackModels === undefined
       ? parseFallbackModelList(configuredValue("ASTOCK_AGENT_FALLBACK_MODELS"))
       : config.fallbackModels.flatMap((entry) => parseFallbackModelList(entry))
+  // 专属 > 全局 > openai 历史变量；备用模型只读自己 provider 的专属变量（openai 兼容历史变量）
+  const providerBaseUrl = (name: string): string | undefined =>
+    configuredValue(providerBaseUrlEnvName(name)) ??
+    (name === "openai" ? configuredValue("OPENAI_BASE_URL") : undefined)
+  const configuredBaseUrl =
+    config.baseUrl ?? providerBaseUrl(provider) ?? configuredValue("ASTOCK_AGENT_BASE_URL")
+  const fallbackBaseUrls: Record<string, string> = {}
+  for (const spec of fallbackSpecs) {
+    const value = providerBaseUrl(spec.provider)
+    if (value !== undefined) fallbackBaseUrls[spec.provider] = value
+  }
   const resolved = resolveModelChain({
     provider,
     modelId,
     baseUrl: configuredBaseUrl,
     fallbackSpecs,
+    fallbackBaseUrls,
   })
   const apiKey = config.apiKey ?? getEnvApiKey(provider)
   const apiKeyName = getEnvApiKeyName(provider)
