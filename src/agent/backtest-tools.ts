@@ -1,4 +1,4 @@
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
+import type { AgentTool } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
 import { runBatchBacktest } from "../backtest/batch"
 import { type BacktestHttp, fetchDailyKlines } from "../backtest/data"
@@ -8,6 +8,7 @@ import { screenStocks } from "../backtest/screen"
 import { createStrategy, listStrategies } from "../backtest/strategy"
 import { isAshareCode, normalizeMarketCode } from "../market/code"
 import type { HotRankSnapshot } from "../market/eastmoney-hot-rank"
+import { jsonToolResult } from "./tool-result"
 
 /** 回测工具依赖的最小上下文，CommandContext 结构兼容 */
 export interface BacktestToolContext {
@@ -32,13 +33,6 @@ interface StrategyInput {
   readonly params?: Record<string, number>
   readonly days?: number
   readonly cash?: number
-}
-
-function jsonResult(value: unknown): AgentToolResult<unknown> {
-  return {
-    content: [{ type: "text", text: JSON.stringify(value) }],
-    details: value,
-  }
 }
 
 function resolveStrategy(input: StrategyInput) {
@@ -98,7 +92,7 @@ export function createBacktestAgentTools(
           throw new Error(`历史数据不足：需要至少 ${required} 根日K，实际 ${bars.length} 根`)
         }
         const result = runBacktest(bars, strategy, { initialCapital: input.cash ?? 100_000 })
-        return jsonResult({
+        return jsonToolResult({
           code,
           strategy: strategy.name,
           strategySummary: strategy.summary,
@@ -136,7 +130,7 @@ export function createBacktestAgentTools(
           initialCapital: input.cash ?? 100_000,
           days,
         })
-        return jsonResult({
+        return jsonToolResult({
           strategy: strategy.name,
           strategySummary: strategy.summary,
           days,
@@ -182,7 +176,7 @@ export function createBacktestAgentTools(
         }
         if (codes.length === 0) throw new Error("自选股为空，无可扫描标的")
         const result = await screenStocks(http, HTTP_TIMEOUT_MS, codes, strategy)
-        return jsonResult({
+        return jsonToolResult({
           strategy: strategy.name,
           strategySummary: strategy.summary,
           source,

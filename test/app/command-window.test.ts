@@ -79,6 +79,10 @@ class ScriptedAgentDriver implements AgentDriver {
 
   clear(): void {}
   abort(): void {}
+
+  usageSummary(): string {
+    return ""
+  }
 }
 
 class LongAnswerAgentDriver implements AgentDriver {
@@ -91,6 +95,10 @@ class LongAnswerAgentDriver implements AgentDriver {
 
   clear(): void {}
   abort(): void {}
+
+  usageSummary(): string {
+    return ""
+  }
 }
 
 describe("Agent 命令窗口", () => {

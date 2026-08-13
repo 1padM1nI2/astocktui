@@ -144,6 +144,10 @@ class StubDriver implements AgentDriver {
   async run(_input: string, _emit: (event: AgentDriverEvent) => void): Promise<void> {}
   clear(): void {}
   abort(): void {}
+
+  usageSummary(): string {
+    return ""
+  }
 }
 
 describe("Agent 上下文人气榜", () => {

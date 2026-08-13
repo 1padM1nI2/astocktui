@@ -1,4 +1,4 @@
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
+import type { AgentTool } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
 import type { CommandContext } from "../commands/commands"
 import type { ConditionalOrderService } from "../trading/conditional-order-service"
@@ -6,6 +6,7 @@ import type {
   ConditionalOrderAction,
   ConditionalOrderCondition,
 } from "../trading/conditional-orders"
+import { jsonToolResult } from "./tool-result"
 
 const conditionSchema = z.object({
   type: z.enum(["price", "change-percent", "rebound", "drawdown", "volume-ratio", "time"]),
@@ -49,10 +50,6 @@ type ConditionToolInput = {
   readonly expiresAt?: string
   readonly triggerPolicy?: "once" | "repeat"
   readonly cooldownMinutes?: number
-}
-
-function result(value: unknown): AgentToolResult<unknown> {
-  return { content: [{ type: "text", text: JSON.stringify(value) }], details: value }
 }
 
 function normalizeCondition(
@@ -116,7 +113,7 @@ export function createConditionAgentTools(context: CommandContext): readonly Age
         if (input.action === "create") {
           if (input.code === undefined) throw new Error("创建条件单需要 code")
           if (input.condition === undefined) throw new Error("创建条件单需要 condition")
-          return result(
+          return jsonToolResult(
             orders.create({
               code: input.code,
               name: input.name ?? input.code,
@@ -133,7 +130,7 @@ export function createConditionAgentTools(context: CommandContext): readonly Age
         if (input.action === "cancel") orders.cancel(input.id ?? "")
         if (input.action === "pause") orders.pause(input.id ?? "")
         if (input.action === "resume") orders.resume(input.id ?? "")
-        return result(orders.orders)
+        return jsonToolResult(orders.orders)
       },
     },
   ]

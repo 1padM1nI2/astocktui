@@ -1,4 +1,4 @@
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
+import type { AgentTool } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
 import type { CommandContext, RefreshTarget, WorkspaceName } from "../commands/commands"
 import type { OrderQuantity, TradeQuote, TradeSide } from "../trading/trading"
@@ -8,13 +8,7 @@ import { createFileAgentTools } from "./file-tools"
 import { createMemoryAgentTools } from "./memory-tools"
 import { createStockAgentTools } from "./stock-tools"
 import { createScheduledTaskAgentTools } from "./task-tools"
-
-function jsonResult(value: unknown): AgentToolResult<unknown> {
-  return {
-    content: [{ type: "text", text: JSON.stringify(value) }],
-    details: value,
-  }
-}
+import { jsonToolResult } from "./tool-result"
 
 function requiredQuoteError(code: string): Error {
   return new Error(`无法获取股票行情：${code}`)
@@ -54,7 +48,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
       parameters: z.object({}),
       intent: "omit",
       approval: "read",
-      execute: async () => jsonResult(context.status()),
+      execute: async () => jsonToolResult(context.status()),
     },
     {
       name: "get_market_snapshot",
@@ -64,7 +58,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
       parameters: z.object({}),
       intent: "omit",
       approval: "read",
-      execute: async () => jsonResult(context.marketSnapshot() ?? { status: "not_loaded" }),
+      execute: async () => jsonToolResult(context.marketSnapshot() ?? { status: "not_loaded" }),
     },
     {
       name: "get_market_overview",
@@ -76,7 +70,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
       approval: "read",
       execute: async (_id, params) => {
         const refresh = (params as { readonly refresh?: boolean }).refresh === true
-        return jsonResult(await context.marketOverview(refresh))
+        return jsonToolResult(await context.marketOverview(refresh))
       },
     },
     {
@@ -93,7 +87,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
       approval: "read",
       execute: async (_id, params) => {
         const snapshot = context.newsSnapshot()
-        if (snapshot === null) return jsonResult({ status: "not_loaded" })
+        if (snapshot === null) return jsonToolResult({ status: "not_loaded" })
         const input = params as NewsToolInput
         const query = input.query?.trim().toLocaleLowerCase()
         const sources = input.sources === undefined ? null : new Set(input.sources)
@@ -105,7 +99,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
             (sources === null || sources.has(item.source)),
         )
         const limit = Math.min(50, Math.max(1, input.limit ?? 40))
-        return jsonResult({
+        return jsonToolResult({
           source: snapshot.source,
           total: matches.length,
           availableSources: [...new Set(snapshot.items.map((item) => item.source))],
@@ -120,7 +114,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
       parameters: z.object({}),
       intent: "omit",
       approval: "read",
-      execute: async () => jsonResult(context.portfolio()),
+      execute: async () => jsonToolResult(context.portfolio()),
     },
     {
       name: "get_hot_rank",
@@ -137,10 +131,10 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
         const input = params as { readonly refresh?: boolean; readonly limit?: number }
         const snapshot = await context.hotRank?.(input.refresh === true)
         if (snapshot === undefined || snapshot === null) {
-          return jsonResult({ status: "not_loaded" })
+          return jsonToolResult({ status: "not_loaded" })
         }
         const limit = Math.min(100, Math.max(1, input.limit ?? 50))
-        return jsonResult({
+        return jsonToolResult({
           source: snapshot.source,
           updatedAt: snapshot.updatedAt,
           total: snapshot.items.length,
@@ -155,7 +149,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
       parameters: z.object({}),
       intent: "omit",
       approval: "read",
-      execute: async () => jsonResult(context.trading().trades),
+      execute: async () => jsonToolResult(context.trading().trades),
     },
     {
       name: "refresh_data",
@@ -167,7 +161,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
       execute: async (_id, params) => {
         const target = (params as { readonly target: RefreshTarget }).target
         await context.refreshAndWait(target)
-        return jsonResult({ target, status: "completed" })
+        return jsonToolResult({ target, status: "completed" })
       },
     },
     {
@@ -186,11 +180,11 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
           : "write",
       execute: async (_id, params) => {
         const input = params as WatchlistToolInput
-        if (input.action === "list") return jsonResult({ codes: context.watchlist() })
+        if (input.action === "list") return jsonToolResult({ codes: context.watchlist() })
         if (input.code === undefined) throw new Error(`${input.action} 操作需要股票代码`)
         const change = await context.changeWatchlist(input.action, input.code)
         if (!change.ok) throw new Error(change.message)
-        return jsonResult({ ...change, codes: context.watchlist() })
+        return jsonToolResult({ ...change, codes: context.watchlist() })
       },
     },
     {
@@ -214,7 +208,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
           .trading()
           .preview(input.side, tradeQuoteAtPrice(quote, input.price), input.quantity)
         if (!result.ok || result.preview === undefined) throw new Error(result.message)
-        return jsonResult(result.preview)
+        return jsonToolResult(result.preview)
       },
     },
     {
@@ -240,7 +234,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
           .execute(input.side, tradeQuoteAtPrice(quote, input.price), input.quantity)
         if (!result.ok) throw new Error(result.message)
         context.portfolioChanged()
-        return jsonResult(result)
+        return jsonToolResult(result)
       },
     },
     {
@@ -256,7 +250,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
         if (input.confirmation !== "RESET") throw new Error("重置模拟账户必须确认 RESET")
         context.trading().reset()
         context.portfolioChanged()
-        return jsonResult({ status: "reset", account: context.portfolio() })
+        return jsonToolResult({ status: "reset", account: context.portfolio() })
       },
     },
     {
@@ -271,7 +265,7 @@ export function createAStockAgentTools(context: CommandContext): readonly AgentT
       execute: async (_id, params) => {
         const input = params as { readonly workspace: WorkspaceName }
         context.focus(input.workspace)
-        return jsonResult({ workspace: input.workspace })
+        return jsonToolResult({ workspace: input.workspace })
       },
     },
     ...createFileAgentTools(),

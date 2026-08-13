@@ -11,6 +11,7 @@ export const EMPTY_AGENT_SESSION: AgentSessionView = {
   tools: [],
   error: null,
   history: [],
+  usageSummary: "",
 }
 
 export function renderAgentBody(view: AgentSessionView, width: number): readonly string[] {

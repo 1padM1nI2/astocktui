@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { stripVTControlCharacters } from "node:util"
 import { visibleWidth } from "@oh-my-pi/pi-tui"
+import { EMPTY_AGENT_SESSION } from "../../src/agent/body"
 import type { AgentSessionView } from "../../src/agent/controller"
 import { ANSI } from "../../src/app/colors"
 import { AgentWorkspace } from "../../src/components/agent"
@@ -43,6 +44,19 @@ describe("Agent 主聊天面板", () => {
 
     const empty = new AgentWorkspace("", true).renderAtHeight(100, 15).join("\n")
     expect(empty).toContain("记忆 0 条")
+  })
+
+  test("副标题展示 Agent 缓存命中摘要，无数据时不占位", () => {
+    const withUsage = new AgentWorkspace("", true, undefined, {
+      ...EMPTY_AGENT_SESSION,
+      usageSummary: "缓存命中 75% · 输入 16.0k · 输出 1.0k · 2 步",
+    })
+      .renderAtHeight(100, 15)
+      .join("\n")
+    expect(withUsage).toContain("缓存命中 75%")
+
+    const without = new AgentWorkspace("", true).renderAtHeight(100, 15).join("\n")
+    expect(without).not.toContain("缓存命中")
   })
 
   test("副标题展示并截断自定义定时任务摘要", () => {
@@ -110,6 +124,7 @@ describe("Agent 主聊天面板", () => {
       answer: "",
       tools: [],
       error: null,
+      usageSummary: "",
       history: [
         { user: "问题一", answer: "回答一", tools: [] },
         { user: "问题二", answer: "回答二", tools: [] },
@@ -132,6 +147,7 @@ describe("Agent 主聊天面板", () => {
       answer: "现在的回答",
       tools: [],
       error: null,
+      usageSummary: "",
       history: [
         {
           user: "上次的问题",
@@ -180,6 +196,7 @@ describe("Agent 主聊天面板", () => {
       ],
       error: null,
       history: [],
+      usageSummary: "",
     }
     const frame = new AgentWorkspace("", true, undefined, view).renderAtHeight(100, 15).join("\n")
 
@@ -212,6 +229,7 @@ describe("Agent 主聊天面板", () => {
       tools: [],
       error: null,
       history: [],
+      usageSummary: "",
     }
 
     const lines = new AgentWorkspace("", true, undefined, view).renderAtHeight(52, 20)
@@ -236,6 +254,7 @@ describe("Agent 主聊天面板", () => {
       tools: [],
       error: null,
       history: [],
+      usageSummary: "",
     }
 
     const lines = new AgentWorkspace("", true, undefined, view).renderAtHeight(32, 14)

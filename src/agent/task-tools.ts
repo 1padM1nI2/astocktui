@@ -1,8 +1,9 @@
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
+import type { AgentTool } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
 import type { CommandContext } from "../commands/commands"
 import type { ScheduledTaskService } from "./scheduled-task-service"
 import type { ScheduledTaskInput } from "./scheduled-tasks"
+import { jsonToolResult } from "./tool-result"
 
 const scheduleSchema = z.object({
   kind: z.enum(["once", "daily", "interval"]),
@@ -36,10 +37,6 @@ type TaskToolInput = {
   readonly prompt?: string
   readonly schedule?: TaskToolSchedule
   readonly mode?: "agent" | "research"
-}
-
-function result(value: unknown): AgentToolResult<unknown> {
-  return { content: [{ type: "text", text: JSON.stringify(value) }], details: value }
 }
 
 function normalizeSchedule(schedule: TaskToolSchedule): ScheduledTaskInput["schedule"] {
@@ -87,18 +84,20 @@ export function createScheduledTaskAgentTools(context: CommandContext): readonly
         const input = params as TaskToolInput
         const tasks = service()
         if (input.action === "list")
-          return result({
+          return jsonToolResult({
             total: tasks.list().length,
             tasks: tasks.list().map((task) => ({ ...task, mode: task.mode ?? "agent" })),
           })
-        if (input.action === "create") return result(tasks.create(taskInput(input), "agent"))
+        if (input.action === "create")
+          return jsonToolResult(tasks.create(taskInput(input), "agent"))
         const id = input.id
         if (id === undefined) throw new Error("操作定时任务必须提供 id")
-        if (input.action === "update") return result(tasks.update(id, taskInput(input), "agent"))
-        if (input.action === "pause") return result(tasks.pause(id))
-        if (input.action === "resume") return result(tasks.resume(id))
-        if (input.action === "remove") return result({ ok: tasks.remove(id), id })
-        return result({ id, result: tasks.runNow(id) })
+        if (input.action === "update")
+          return jsonToolResult(tasks.update(id, taskInput(input), "agent"))
+        if (input.action === "pause") return jsonToolResult(tasks.pause(id))
+        if (input.action === "resume") return jsonToolResult(tasks.resume(id))
+        if (input.action === "remove") return jsonToolResult({ ok: tasks.remove(id), id })
+        return jsonToolResult({ id, result: tasks.runNow(id) })
       },
     },
   ]

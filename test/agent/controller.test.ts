@@ -31,6 +31,10 @@ class FakeAgentDriver implements AgentDriver {
   }
 
   abort(): void {}
+
+  usageSummary(): string {
+    return ""
+  }
 }
 
 class AutonomousTradeDriver implements AgentDriver {
@@ -48,6 +52,10 @@ class AutonomousTradeDriver implements AgentDriver {
   }
   clear(): void {}
   abort(): void {}
+
+  usageSummary(): string {
+    return ""
+  }
 }
 
 describe("Pi Agent 会话控制器", () => {

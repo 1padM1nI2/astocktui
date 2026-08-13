@@ -1,4 +1,5 @@
 import type { Agent, AgentMessage } from "@oh-my-pi/pi-agent-core"
+import { summaryContextMessage } from "./context-compaction"
 import type { AgentDriverEvent } from "./controller"
 import { isContextOverflowError } from "./models"
 
@@ -139,19 +140,6 @@ export async function recoverInterruptedTurn(options: TurnRecoveryOptions): Prom
     while (advanceAfterQuotaFailure(base)) await agent.continue()
   }
   return base
-}
-
-function summaryContextMessage(summary: string): AgentMessage {
-  return {
-    role: "user",
-    content: [
-      {
-        type: "text",
-        text: `[系统] 以下是较早对话的摘要，仅供上下文参考，无需回复：\n${summary}`,
-      },
-    ],
-    timestamp: Date.now(),
-  } as AgentMessage
 }
 
 /**

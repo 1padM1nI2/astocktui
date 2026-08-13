@@ -63,6 +63,10 @@ class WorkspaceAgentDriver implements AgentDriver {
 
   clear(): void {}
   abort(): void {}
+
+  usageSummary(): string {
+    return ""
+  }
 }
 
 describe("市场智能工作台", () => {

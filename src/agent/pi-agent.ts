@@ -31,6 +31,9 @@ class UnavailableAgentDriver implements AgentDriver {
   async run(): Promise<void> {}
   clear(): void {}
   abort(): void {}
+  usageSummary(): string {
+    return ""
+  }
 }
 
 /** 模型链解析结果，主 agent 与只读调研子任务共用 */

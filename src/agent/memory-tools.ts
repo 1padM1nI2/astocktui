@@ -1,12 +1,9 @@
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
+import type { AgentTool } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
 import type { CommandContext } from "../commands/commands"
 import type { MemoryInput, MemoryKind } from "./memory"
 import type { MemoryService } from "./memory-service"
-
-function result(value: unknown): AgentToolResult<unknown> {
-  return { content: [{ type: "text", text: JSON.stringify(value) }], details: value }
-}
+import { jsonToolResult } from "./tool-result"
 
 interface RememberInput {
   readonly kind: MemoryKind
@@ -47,7 +44,7 @@ export function createMemoryAgentTools(context: CommandContext): readonly AgentT
       approval: "write",
       execute: async (_id, params) => {
         const input = params as RememberInput
-        return result(
+        return jsonToolResult(
           service().remember({ kind: input.kind, content: input.content, tags: input.tags ?? [] }),
         )
       },
@@ -61,7 +58,7 @@ export function createMemoryAgentTools(context: CommandContext): readonly AgentT
       approval: "read",
       execute: async () => {
         const entries = service().list()
-        return result({ total: entries.length, entries })
+        return jsonToolResult({ total: entries.length, entries })
       },
     },
     {
@@ -73,7 +70,7 @@ export function createMemoryAgentTools(context: CommandContext): readonly AgentT
       approval: "write",
       execute: async (_id, params) => {
         const input = params as { readonly id: string }
-        return result({ ok: service().forget(input.id), id: input.id })
+        return jsonToolResult({ ok: service().forget(input.id), id: input.id })
       },
     },
     {
@@ -89,7 +86,7 @@ export function createMemoryAgentTools(context: CommandContext): readonly AgentT
         const input = params as ReplaceInput
         const memory = service()
         const entries = memory.replaceAll(input.entries)
-        return result({ total: entries.length, lastDreamAt: memory.lastDreamAt, entries })
+        return jsonToolResult({ total: entries.length, lastDreamAt: memory.lastDreamAt, entries })
       },
     },
   ]

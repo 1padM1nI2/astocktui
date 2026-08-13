@@ -9,6 +9,10 @@ class Driver implements AgentDriver {
   }
   clear(): void {}
   abort(): void {}
+
+  usageSummary(): string {
+    return ""
+  }
 }
 
 test("系统事件按顺序派发并去重", async () => {
