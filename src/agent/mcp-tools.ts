@@ -1,7 +1,8 @@
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
+import type { AgentTool } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
 import type { McpServerDefinition } from "../mcp/config-writer"
 import type { AgentExtensionRuntime } from "./extensions"
+import { jsonToolResult } from "./tool-result"
 
 interface ManageMcpInput {
   readonly action: "list" | "add" | "remove"
@@ -14,10 +15,6 @@ interface ManageMcpInput {
   readonly url?: string
   readonly headers?: Readonly<Record<string, string>>
   readonly timeout?: number
-}
-
-function result(value: unknown): AgentToolResult<unknown> {
-  return { content: [{ type: "text", text: JSON.stringify(value) }], details: value }
 }
 
 function definitionOf(input: ManageMcpInput): McpServerDefinition {
@@ -59,16 +56,16 @@ export function createMcpAgentTools(extensions: AgentExtensionRuntime): readonly
           : { tier: "exec", reason: "将修改项目 mcp.json 并连接外部 MCP server", override: true },
       execute: async (_id, params) => {
         const input = params as ManageMcpInput
-        if (input.action === "list") return result({ servers: extensions.mcpStatuses() })
+        if (input.action === "list") return jsonToolResult({ servers: extensions.mcpStatuses() })
         if (input.name === undefined || input.name.length === 0) {
           throw new Error(`${input.action} 操作需要 name`)
         }
         if (input.action === "remove") {
           await extensions.removeMcpServer(input.name)
-          return result({ ok: true, action: "remove", name: input.name })
+          return jsonToolResult({ ok: true, action: "remove", name: input.name })
         }
         await extensions.addMcpServer(input.name, definitionOf(input))
-        return result({ ok: true, action: "add", name: input.name })
+        return jsonToolResult({ ok: true, action: "add", name: input.name })
       },
     },
   ]

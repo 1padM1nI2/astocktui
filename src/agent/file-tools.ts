@@ -1,7 +1,8 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
+import type { AgentTool } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
+import { jsonToolResult } from "./tool-result"
 
 declare global {
   // oh-my-pi 宿主可注入会话工具；独立终端缺失时回退到本地文件 API
@@ -15,10 +16,6 @@ declare global {
         }): Promise<unknown>
       }
     | undefined
-}
-
-function result(value: unknown): AgentToolResult<unknown> {
-  return { content: [{ type: "text", text: JSON.stringify(value) }], details: value }
 }
 
 async function readLocalFile(path: string, selector: string | undefined): Promise<string> {
@@ -78,7 +75,7 @@ export function createFileAgentTools(): readonly AgentTool[] {
         const input = params as { path: string; selector?: string }
         const target = await stat(input.path).catch(() => null)
         if (target?.isDirectory()) {
-          return result({
+          return jsonToolResult({
             type: "directory",
             path: input.path,
             entries: await listDirectory(input.path),
@@ -87,9 +84,9 @@ export function createFileAgentTools(): readonly AgentTool[] {
         if (globalThis.tool !== undefined) {
           const targetPath =
             input.selector === undefined ? input.path : `${input.path}:${input.selector}`
-          return result(await globalThis.tool.read({ path: targetPath }))
+          return jsonToolResult(await globalThis.tool.read({ path: targetPath }))
         }
-        return result(await readLocalFile(input.path, input.selector))
+        return jsonToolResult(await readLocalFile(input.path, input.selector))
       },
     },
     {
@@ -103,7 +100,11 @@ export function createFileAgentTools(): readonly AgentTool[] {
         const input = params as { path: string; content: string }
         await mkdir(dirname(input.path), { recursive: true })
         await writeFile(input.path, input.content, "utf8")
-        return result({ ok: true, path: input.path, bytes: Buffer.byteLength(input.content) })
+        return jsonToolResult({
+          ok: true,
+          path: input.path,
+          bytes: Buffer.byteLength(input.content),
+        })
       },
     },
     {
@@ -120,14 +121,14 @@ export function createFileAgentTools(): readonly AgentTool[] {
       execute: async (_id, params) => {
         const input = params as { path: string; old_text: string; new_text: string }
         if (globalThis.tool !== undefined) {
-          return result(
+          return jsonToolResult(
             await globalThis.tool.edit({
               path: input.path,
               edits: [{ old_text: input.old_text, new_text: input.new_text }],
             }),
           )
         }
-        return result(await editLocalFile(input.path, input.old_text, input.new_text))
+        return jsonToolResult(await editLocalFile(input.path, input.old_text, input.new_text))
       },
     },
     {
@@ -139,7 +140,7 @@ export function createFileAgentTools(): readonly AgentTool[] {
       approval: "read",
       execute: async (_id, params) => {
         const input = params as { path: string }
-        return result({ path: input.path, entries: await listDirectory(input.path) })
+        return jsonToolResult({ path: input.path, entries: await listDirectory(input.path) })
       },
     },
     {
@@ -153,7 +154,7 @@ export function createFileAgentTools(): readonly AgentTool[] {
         const input = params as { from: string; to: string }
         await mkdir(dirname(input.to), { recursive: true })
         await rename(input.from, input.to)
-        return result({ ok: true, from: input.from, to: input.to })
+        return jsonToolResult({ ok: true, from: input.from, to: input.to })
       },
     },
     {
@@ -166,7 +167,7 @@ export function createFileAgentTools(): readonly AgentTool[] {
       execute: async (_id, params) => {
         const input = params as { path: string }
         await mkdir(input.path, { recursive: true })
-        return result({ ok: true, path: input.path })
+        return jsonToolResult({ ok: true, path: input.path })
       },
     },
     {
@@ -183,7 +184,7 @@ export function createFileAgentTools(): readonly AgentTool[] {
           throw new Error("删除目录必须设置 recursive 为 true")
         }
         await rm(input.path, { recursive: input.recursive === true })
-        return result({ ok: true, path: input.path })
+        return jsonToolResult({ ok: true, path: input.path })
       },
     },
   ]

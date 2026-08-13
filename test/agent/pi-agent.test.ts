@@ -182,6 +182,8 @@ interface StubMessage {
   readonly role: string
   readonly stopReason?: string
   readonly errorMessage?: string
+  readonly content?: unknown
+  readonly usage?: unknown
 }
 
 class StubAgent {
@@ -190,11 +192,17 @@ class StubAgent {
   continued = 0
   readonly failWith: string | null
   lengthStops: number
+  #listener: ((event: unknown) => void) | undefined
   constructor(failWith: string | null, lengthStops = 0) {
     this.failWith = failWith
     this.lengthStops = lengthStops
   }
-  subscribe(): void {}
+  subscribe(listener: (event: unknown) => void): void {
+    this.#listener = listener
+  }
+  emitEvent(event: unknown): void {
+    this.#listener?.(event)
+  }
   setSystemPrompt(): void {}
   setTools(tools: { name: string }[]): void {
     this.tools = tools
@@ -839,4 +847,119 @@ test("手动切换模型：按序号、标签或链外 provider/model", () => {
 
   expect(() => driver.selectModel("not-a-model")).toThrow()
   expect(() => driver.selectModel("openai/no-such-model-xyz")).toThrow()
+})
+
+test("记录每步 token 用量并汇总缓存命中率", () => {
+  const agent = new StubAgent(null)
+  const debug: { readonly kind: string; readonly fields: Record<string, unknown> }[] = []
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "deepseek/m1" }],
+    new Map(),
+    () => [],
+    undefined,
+    undefined,
+    (kind, fields) => debug.push({ kind, fields }),
+  )
+  const message = (input: number, cacheRead: number) => ({
+    role: "assistant",
+    stopReason: "stop",
+    usage: {
+      input,
+      output: 100,
+      cacheRead,
+      cacheWrite: 0,
+      totalTokens: input + cacheRead + 100,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+  })
+  agent.emitEvent({ type: "message_end", message: message(1000, 3000) })
+  agent.emitEvent({ type: "message_end", message: message(1000, 3000) })
+  agent.emitEvent({
+    type: "message_end",
+    message: { role: "assistant", stopReason: "error", errorMessage: "boom" },
+  })
+
+  expect(debug.map((entry) => entry.kind)).toEqual(["agent_usage", "agent_usage"])
+  expect(debug[0]?.fields).toMatchObject({ input: 1000, cacheRead: 3000, hitRate: 0.75 })
+  expect(driver.usageSummary()).toContain("缓存命中 75%")
+  expect(driver.usageSummary()).toContain("2 步")
+
+  driver.clear()
+  expect(driver.usageSummary()).toBe("")
+})
+
+test("上下文达到窗口阈值时在下轮前主动压缩", async () => {
+  const agent = new StubAgent(null)
+  const oldTurn = [
+    { role: "user", content: "早先问题" },
+    { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "早先回答" }] },
+  ]
+  const recentTurn = [
+    { role: "user", content: "最近问题" },
+    {
+      role: "assistant",
+      stopReason: "stop",
+      content: [{ type: "text", text: "最近回答" }],
+      usage: {
+        input: 900,
+        output: 10,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 910,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+    },
+  ]
+  agent.state.messages.push(...oldTurn, ...recentTurn)
+  const debug: string[] = []
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1", contextWindow: 1000 } as never, label: "deepseek/m1" }],
+    new Map(),
+    () => [],
+    undefined,
+    undefined,
+    (kind) => debug.push(kind),
+    async () => "较早对话摘要",
+  )
+  await driver.run("继续分析", () => {})
+  expect(debug).toContain("agent_context_compact")
+  // 压缩后：摘要 + 最近回合 + 本轮 user/assistant
+  expect(agent.state.messages).toHaveLength(5)
+  expect(JSON.stringify(agent.state.messages[0])).toContain("较早对话摘要")
+  expect(agent.state.messages[1]).toMatchObject({ role: "user", content: "最近问题" })
+})
+
+test("上下文未达阈值时不主动压缩", async () => {
+  const agent = new StubAgent(null)
+  agent.state.messages.push(
+    { role: "user", content: "问题" },
+    {
+      role: "assistant",
+      stopReason: "stop",
+      usage: {
+        input: 100,
+        output: 10,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 110,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+    },
+  )
+  const debug: string[] = []
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1", contextWindow: 1000 } as never, label: "deepseek/m1" }],
+    new Map(),
+    () => [],
+    undefined,
+    undefined,
+    (kind) => debug.push(kind),
+    async () => "摘要",
+  )
+  await driver.run("继续", () => {})
+  expect(debug).not.toContain("agent_context_compact")
+  expect(agent.state.messages[0]).toMatchObject({ role: "user", content: "问题" })
 })

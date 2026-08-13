@@ -99,6 +99,10 @@ class CapturingDriver implements AgentDriver {
   }
   clear(): void {}
   abort(): void {}
+
+  usageSummary(): string {
+    return ""
+  }
 }
 
 test("应用通过命令窗口提交 Skill、显示 MCP 状态并在退出时销毁扩展", async () => {

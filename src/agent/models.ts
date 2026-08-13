@@ -147,3 +147,84 @@ export function resolveModelTarget(
   }
   return { index: models.length, models: [...models, option] }
 }
+
+export interface ModelChainHooks {
+  readonly onDebug?: ((kind: string, fields: Record<string, unknown>) => void) | undefined
+  readonly onModelChange?: (() => void) | undefined
+}
+
+/** 模型链游标：当前模型、手动切换、额度耗尽回退与定时回切的有状态封装 */
+export class ModelChainCursor {
+  #models: readonly AgentModelOption[]
+  #index = 0
+  #quotaFellBackAt: number | null = null
+  readonly #hooks: ModelChainHooks
+
+  constructor(models: readonly AgentModelOption[], hooks: ModelChainHooks = {}) {
+    this.#models = models
+    this.#hooks = hooks
+  }
+
+  get current(): AgentModelOption | undefined {
+    return this.#models[this.#index]
+  }
+
+  get currentLabel(): string {
+    return this.current?.label ?? ""
+  }
+
+  get hasNext(): boolean {
+    return this.#index + 1 < this.#models.length
+  }
+
+  labels(): readonly string[] {
+    return this.#models.map((option) => option.label)
+  }
+
+  select(agent: Agent, target: string): string {
+    const resolution = resolveModelTarget(this.#models, target)
+    if ("error" in resolution) throw new Error(resolution.error)
+    this.#models = resolution.models
+    // 手动选择生效即视为用户接管，取消额度回退的自动回切
+    this.#quotaFellBackAt = null
+    if (resolution.index === this.#index) return this.currentLabel
+    this.#index = resolution.index
+    const option = this.#models[resolution.index]
+    if (option === undefined) throw new Error(`无效模型：${target}`)
+    this.#switch(agent, option, "agent_model_switch", { to: option.label })
+    return option.label
+  }
+
+  /** 额度回退后按重试间隔切回主模型；返回是否发生了切换 */
+  revertToPrimaryIfDue(agent: Agent): boolean {
+    const revert = decidePrimaryRevert(this.#index, this.#quotaFellBackAt, this.#models)
+    if (revert.clear) this.#quotaFellBackAt = null
+    if (revert.primary === undefined) return false
+    this.#index = 0
+    this.#switch(agent, revert.primary, "agent_fallback_retry", { to: revert.primary.label })
+    return true
+  }
+
+  /** 额度耗尽时切到下一个备用模型；无备用可切返回 undefined */
+  advanceToFallback(agent: Agent, reason: string): AgentModelOption | undefined {
+    if (!this.hasNext) return undefined
+    const from = this.currentLabel
+    this.#index++
+    this.#quotaFellBackAt = Date.now()
+    const next = this.#models[this.#index]
+    if (next === undefined) return undefined
+    this.#switch(agent, next, "agent_fallback", { from, to: next.label, reason })
+    return next
+  }
+
+  #switch(
+    agent: Agent,
+    option: AgentModelOption,
+    kind: string,
+    fields: Record<string, unknown>,
+  ): void {
+    agent.setModel(option.model)
+    this.#hooks.onDebug?.(kind, fields)
+    this.#hooks.onModelChange?.()
+  }
+}

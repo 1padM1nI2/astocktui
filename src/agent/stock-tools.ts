@@ -1,22 +1,16 @@
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core"
+import type { AgentTool } from "@oh-my-pi/pi-agent-core"
 import { z } from "@oh-my-pi/pi-ai"
 import { isAshareCode, normalizeMarketCode } from "../market/code"
 import type { StockDetail } from "../market/stock-detail"
 import type { StockSearchMatch } from "../market/stock-search"
 import type { TradeQuote } from "../trading/trading"
+import { jsonToolResult } from "./tool-result"
 
 /** 个股搜索与详情工具依赖的最小上下文，CommandContext 结构兼容 */
 export interface StockToolContext {
   quote(code: string): Promise<TradeQuote | undefined>
   quoteDetail?(code: string): Promise<StockDetail | undefined>
   searchStocks?(query: string): Promise<readonly StockSearchMatch[]>
-}
-
-function jsonResult(value: unknown): AgentToolResult<unknown> {
-  return {
-    content: [{ type: "text", text: JSON.stringify(value) }],
-    details: value,
-  }
 }
 
 /** 名称搜索 + 任意个股详情：与 manage_watchlist 互补，全程不改动自选股 */
@@ -35,7 +29,7 @@ export function createStockAgentTools(context: StockToolContext): readonly Agent
         const search = context.searchStocks
         if (search === undefined) throw new Error("当前环境不支持股票搜索")
         const matches = await search(query)
-        return jsonResult({ query, total: matches.length, matches })
+        return jsonToolResult({ query, total: matches.length, matches })
       },
     },
     {
@@ -57,7 +51,7 @@ export function createStockAgentTools(context: StockToolContext): readonly Agent
         ])
         if (quote === undefined && detail === undefined)
           throw new Error(`无法获取 ${code} 的行情，请检查代码或稍后重试`)
-        return jsonResult({
+        return jsonToolResult({
           code,
           name: quote?.name ?? detail?.name ?? code,
           price: quote?.price ?? detail?.open ?? null,

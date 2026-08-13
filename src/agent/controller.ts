@@ -28,6 +28,8 @@ export interface AgentSessionView {
   readonly tools: readonly AgentToolView[]
   readonly error: string | null
   readonly history: readonly AgentExchangeView[]
+  /** 会话累计用量摘要（缓存命中率、输入输出 token、步数）；无数据为空串 */
+  readonly usageSummary: string
 }
 
 export type AgentDriverEvent =
@@ -51,6 +53,8 @@ export interface AgentDriver {
   run(input: string, emit: (event: AgentDriverEvent) => void): Promise<void>
   clear(): void
   abort(): void
+  /** 会话累计用量摘要（缓存命中率等）；无数据返回空串 */
+  usageSummary(): string
 }
 
 interface MutableToolView {
@@ -121,6 +125,7 @@ export class AgentController {
       answer: this.#answer,
       tools: this.#tools.map((tool) => ({ ...tool })),
       error: this.#error,
+      usageSummary: this.#driver.usageSummary(),
       history: this.#history.map((exchange) => ({
         ...exchange,
         tools: exchange.tools.map((tool) => ({ ...tool })),

@@ -131,9 +131,11 @@ export class AgentWorkspace implements Component {
     if (this.#scheduledTasks.diagnostic !== null) taskSummary = "任务存储异常"
     else if (this.#scheduledTasks.nextTask !== null)
       taskSummary += ` · 下次 ${this.#scheduledTasks.nextTask.name}`
+    const usage = this.#agentView.usageSummary
+    const usageSegment = usage.length > 0 ? ` · ${usage}` : ""
     const lines: string[] = [
       fitLine(
-        `${ANSI.brightBlack}会话 1 · ${taskSummary} · 记忆 ${this.#memoryCount} 条 · 模型 ${this.#agentView.modelLabel} · 上下文 行情 + 持仓 + 财经新闻${ANSI.reset}`,
+        `${ANSI.brightBlack}会话 1 · ${taskSummary} · 记忆 ${this.#memoryCount} 条 · 模型 ${this.#agentView.modelLabel} · 上下文 行情 + 持仓 + 财经新闻${usageSegment}${ANSI.reset}`,
         contentWidth,
       ),
     ]
