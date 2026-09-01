@@ -5,3 +5,4 @@ dist/
 .omo/run-continuation/
 
 .env
+audit.log
