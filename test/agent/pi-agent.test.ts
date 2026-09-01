@@ -319,6 +319,11 @@ class StubAgent {
     this.#respond(input)
   }
   async continue(): Promise<void> {
+    // 与真实 pi-agent-core 一致：只能从 user/tool 消息开始
+    const last = this.state.messages.at(-1)
+    if (last?.role === "assistant") {
+      throw new Error("Cannot continue from message role: assistant")
+    }
     this.continued++
     this.#respond("continue")
   }
@@ -333,7 +338,11 @@ class StubAgent {
     }
     if (this.lengthStops > 0) {
       this.lengthStops--
-      this.state.messages.push({ role: "assistant", stopReason: "length" })
+      this.state.messages.push({
+        role: "assistant",
+        stopReason: "length",
+        content: [{ type: "text", text: "partial" }],
+      })
       return
     }
     this.state.messages.push({ role: "assistant", stopReason: "stop" })
@@ -865,6 +874,76 @@ test("截断续写达到上限后收尾，避免无限生成", async () => {
   await driver.run("分析一下", () => {})
 
   expect(agent.continued).toBe(3)
+})
+
+test("截断末尾无正文时不自动续写", async () => {
+  class BareTruncAgent extends StubAgent {
+    override async prompt(_input: string): Promise<void> {
+      this.state.messages.push({ role: "user" })
+      this.state.messages.push({ role: "assistant", stopReason: "length" })
+    }
+  }
+  const agent = new BareTruncAgent(null)
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+  )
+
+  await driver.run("分析一下", () => {})
+
+  expect(agent.continued).toBe(0)
+  expect(agent.state.messages.map((message) => message.role)).toEqual(["user", "assistant"])
+})
+
+test("续写请求本身超限则压缩后重试", async () => {
+  class TruncThenOverflowAgent extends StubAgent {
+    override async prompt(_input: string): Promise<void> {
+      this.state.messages.push({ role: "user" })
+      this.state.messages.push({
+        role: "assistant",
+        stopReason: "length",
+        content: [{ type: "text", text: "partial" }],
+      })
+    }
+    override async continue(): Promise<void> {
+      const last = this.state.messages.at(-1)
+      if (last?.role === "assistant") {
+        throw new Error("Cannot continue from message role: assistant")
+      }
+      this.continued++
+      if (this.continued === 1) {
+        this.state.messages.push({
+          role: "assistant",
+          stopReason: "error",
+          errorMessage:
+            "400 request (68323 tokens) exceeds the available context size (65536 tokens), try increasing it",
+        })
+        return
+      }
+      this.state.messages.push({ role: "assistant", stopReason: "stop" })
+    }
+  }
+  const agent = new TruncThenOverflowAgent(null)
+  const debug: string[] = []
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+    undefined,
+    undefined,
+    (kind) => debug.push(kind),
+    async () => "早前对话摘要",
+  )
+
+  await driver.run("分析一下", () => {})
+
+  expect(agent.continued).toBe(2)
+  expect(debug).toContain("agent_length_continue")
+  expect(debug).toContain("agent_context_trim")
+  expect(agent.state.messages.at(-1)?.stopReason).toBe("stop")
 })
 
 test("思考等级：设置、查看并随会话持久化", () => {

@@ -134,12 +134,49 @@ export async function recoverInterruptedTurn(options: TurnRecoveryOptions): Prom
     endedOnLengthTruncation(agent.state.messages, base) &&
     attempts < MAX_LENGTH_CONTINUATIONS
   ) {
+    const last = agent.state.messages.at(-1)
+    if (last?.role === "assistant") {
+      // continue() 只能从 user/tool 消息开始：末尾是截断的 assistant 正文时先追加续写指令；
+      // 无正文（如截断在思考中途）或含工具调用时不续写，留给用户手动追问
+      if (messageText(last).length === 0 || hasToolCallPart(last)) return base
+      agent.replaceMessages([...agent.state.messages, lengthContinuationMessage()])
+    }
     attempts++
     onDebug?.("agent_length_continue", { attempt: attempts })
     await agent.continue()
     while (advanceAfterQuotaFailure(base)) await agent.continue()
   }
+  // 续写请求本身可能因上下文已满而超限（截断点贴近窗口上限时）：压缩后重试本轮；
+  // 未发生续写时状态与前置检查相同，不重复重试
+  if (
+    attempts > 0 &&
+    isContextOverflowFailure(agent.state.messages, base) &&
+    (await compactConversationForRetry(agent, summarizer, emit))
+  ) {
+    onDebug?.("agent_context_trim", {})
+    await agent.continue()
+    while (advanceAfterQuotaFailure(base)) await agent.continue()
+  }
   return base
+}
+
+function hasToolCallPart(message: AgentMessage): boolean {
+  const content = (message as { content?: unknown }).content
+  if (!Array.isArray(content)) return false
+  return content.some((part) => (part as { type?: unknown }).type === "toolCall")
+}
+
+function lengthContinuationMessage(): AgentMessage {
+  return {
+    role: "user",
+    content: [
+      {
+        type: "text",
+        text: "[系统] 你上一条回复因长度限制被截断。请从截断处继续，不要重复已输出的内容。",
+      },
+    ],
+    timestamp: Date.now(),
+  } as AgentMessage
 }
 
 /**
