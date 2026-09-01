@@ -61,10 +61,23 @@ export function withAgentBaseUrl<TModel extends { readonly baseUrl: string }>(
   return { ...model, baseUrl: normalized }
 }
 
+export function withAgentContextWindow<TModel extends { readonly contextWindow: number | null }>(
+  model: TModel,
+  contextWindow: number | undefined,
+): TModel {
+  if (contextWindow === undefined) return model
+  if (!Number.isInteger(contextWindow) || contextWindow <= 0) {
+    throw new Error(`Agent Context Window 无效：${String(contextWindow)}`)
+  }
+  return { ...model, contextWindow }
+}
+
 export function resolveModelChain(options: {
   readonly provider: string
   readonly modelId: string
   readonly baseUrl?: string | undefined
+  /** 覆盖主模型上下文窗口（本地端点实际值可能与目录不同）；备用模型保留目录值 */
+  readonly contextWindow?: number | undefined
   readonly fallbackSpecs: readonly FallbackModelSpec[]
   /** 按 provider 的备用模型端点覆盖；非法 URL 返回错误而不是静默回退官方端点 */
   readonly fallbackBaseUrls?: Readonly<Record<string, string>> | undefined
@@ -74,7 +87,10 @@ export function resolveModelChain(options: {
   if (bundled === undefined) return { chain: [], error: `Pi 模型不存在：${label}` }
   let primary: typeof bundled
   try {
-    primary = withAgentBaseUrl(bundled, options.baseUrl)
+    primary = withAgentContextWindow(
+      withAgentBaseUrl(bundled, options.baseUrl),
+      options.contextWindow,
+    )
   } catch (error) {
     return { chain: [], error: error instanceof Error ? error.message : String(error) }
   }

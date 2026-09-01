@@ -65,10 +65,13 @@ export function resolveAgentModelChain(config: PiAgentConfig = {}): AgentModelCh
     const value = providerBaseUrl(spec.provider)
     if (value !== undefined) fallbackBaseUrls[spec.provider] = value
   }
+  const contextWindowRaw = configuredValue("ASTOCK_AGENT_CONTEXT_WINDOW")
+  const contextWindow = contextWindowRaw === undefined ? undefined : Number(contextWindowRaw)
   const resolved = resolveModelChain({
     provider,
     modelId,
     baseUrl: configuredBaseUrl,
+    contextWindow,
     fallbackSpecs,
     fallbackBaseUrls,
   })

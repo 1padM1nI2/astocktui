@@ -64,6 +64,69 @@ test("provider 专属密钥变量优先于 ASTOCK_AGENT_API_KEY 兜底", () => {
   }
 })
 
+test("resolveModelChain 支持 contextWindow 覆盖主模型并保留备用模型目录值", () => {
+  const resolved = resolveModelChain({
+    provider: "qwen-portal",
+    modelId: "coder-model",
+    baseUrl: "http://127.0.0.1:8080/v1",
+    contextWindow: 65536,
+    fallbackSpecs: [{ provider: "deepseek", model: "deepseek-v4-pro" }],
+  })
+  expect(resolved.error).toBeNull()
+  expect(resolved.chain[0]?.model.contextWindow).toBe(65536)
+  const fallback = resolved.chain[1]?.model
+  expect(fallback?.contextWindow).not.toBe(65536)
+})
+
+test("resolveModelChain 对非法 contextWindow 返回错误且链为空", () => {
+  for (const invalid of [-1, 0, 12.5, Number.NaN]) {
+    const resolved = resolveModelChain({
+      provider: "qwen-portal",
+      modelId: "coder-model",
+      contextWindow: invalid,
+      fallbackSpecs: [],
+    })
+    expect(resolved.chain).toEqual([])
+    expect(resolved.error).toContain("Context Window 无效")
+  }
+})
+
+test("ASTOCK_AGENT_CONTEXT_WINDOW 覆盖主模型上下文窗口，未配置时用目录值", () => {
+  process.env["ASTOCK_AGENT_CONTEXT_WINDOW"] = "65536"
+  try {
+    const resolved = resolveAgentModelChain({
+      provider: "qwen-portal",
+      model: "coder-model",
+      baseUrl: "http://127.0.0.1:8080/v1",
+    })
+    expect(resolved.error).toBeNull()
+    expect(resolved.chain[0]?.model.contextWindow).toBe(65536)
+  } finally {
+    delete process.env["ASTOCK_AGENT_CONTEXT_WINDOW"]
+  }
+  const untouched = resolveAgentModelChain({
+    provider: "qwen-portal",
+    model: "coder-model",
+    baseUrl: "http://127.0.0.1:8080/v1",
+  })
+  expect(untouched.chain[0]?.model.contextWindow).toBe(128000)
+})
+
+test("ASTOCK_AGENT_CONTEXT_WINDOW 非法值返回配置错误", () => {
+  process.env["ASTOCK_AGENT_CONTEXT_WINDOW"] = "not-a-number"
+  try {
+    const resolved = resolveAgentModelChain({
+      provider: "qwen-portal",
+      model: "coder-model",
+      baseUrl: "http://127.0.0.1:8080/v1",
+    })
+    expect(resolved.chain).toEqual([])
+    expect(resolved.error).toContain("Context Window 无效")
+  } finally {
+    delete process.env["ASTOCK_AGENT_CONTEXT_WINDOW"]
+  }
+})
+
 test("模型链解析共用入口对未知模型返回错误且链为空", () => {
   const resolved = resolveAgentModelChain({
     provider: "openai",
