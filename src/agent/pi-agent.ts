@@ -72,7 +72,7 @@ export function resolveAgentModelChain(config: PiAgentConfig = {}): AgentModelCh
     fallbackSpecs,
     fallbackBaseUrls,
   })
-  const apiKey = config.apiKey ?? getEnvApiKey(provider)
+  const apiKey = config.apiKey ?? getEnvApiKey(provider) ?? configuredValue("ASTOCK_AGENT_API_KEY")
   const apiKeyName = getEnvApiKeyName(provider)
   return {
     modelLabel: `${provider}/${modelId}`,
@@ -90,8 +90,7 @@ export function createPiAgentController(
   config: PiAgentConfig = {},
   extensions?: AgentExtensionRuntime,
 ): AgentController {
-  const { modelLabel, chain, error, apiKey, configuredApiKey, configurationError } =
-    resolveAgentModelChain(config)
+  const { modelLabel, chain, error, apiKey, configurationError } = resolveAgentModelChain(config)
   if (error !== null || chain.length === 0)
     return new AgentController(new UnavailableAgentDriver(), modelLabel, error ?? undefined)
   const primary = chain[0]
@@ -120,7 +119,7 @@ export function createPiAgentController(
         ? {}
         : { messages: [...restoredMessages] as AgentMessage[] }),
     },
-    ...(configuredApiKey === undefined ? {} : { getApiKey: () => configuredApiKey }),
+    ...(apiKey === undefined ? {} : { getApiKey: () => apiKey }),
     hideThinkingSummary: true,
   })
   agent.subscribe((event) => {

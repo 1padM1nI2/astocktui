@@ -31,6 +31,39 @@ test("模型链解析共用入口解析主模型、备用链与密钥配置", ()
   expect(resolved.configurationError).toBeUndefined()
 })
 
+test("ASTOCK_AGENT_API_KEY 为无 env 映射的 provider（本地 llama.cpp）提供兜底密钥", () => {
+  process.env["ASTOCK_AGENT_API_KEY"] = "local"
+  try {
+    const resolved = resolveAgentModelChain({
+      provider: "qwen-portal",
+      model: "coder-model",
+      baseUrl: "http://127.0.0.1:8080/v1",
+    })
+    expect(resolved.error).toBeNull()
+    expect(resolved.modelLabel).toBe("qwen-portal/coder-model")
+    expect(resolved.chain[0]?.model.baseUrl).toBe("http://127.0.0.1:8080/v1")
+    expect(resolved.apiKey).toBe("local")
+    expect(resolved.configurationError).toBeUndefined()
+  } finally {
+    delete process.env["ASTOCK_AGENT_API_KEY"]
+  }
+})
+
+test("provider 专属密钥变量优先于 ASTOCK_AGENT_API_KEY 兜底", () => {
+  process.env["DEEPSEEK_API_KEY"] = "sk-provider"
+  process.env["ASTOCK_AGENT_API_KEY"] = "local"
+  try {
+    const resolved = resolveAgentModelChain({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+    })
+    expect(resolved.apiKey).toBe("sk-provider")
+  } finally {
+    delete process.env["DEEPSEEK_API_KEY"]
+    delete process.env["ASTOCK_AGENT_API_KEY"]
+  }
+})
+
 test("模型链解析共用入口对未知模型返回错误且链为空", () => {
   const resolved = resolveAgentModelChain({
     provider: "openai",
