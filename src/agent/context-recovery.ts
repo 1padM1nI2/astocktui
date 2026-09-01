@@ -176,7 +176,15 @@ function lengthContinuationMessage(): AgentMessage {
       },
     ],
     timestamp: Date.now(),
+    transientContinuation: true,
   } as AgentMessage
+}
+
+/** 临时续写指令：压缩时跳过、新一轮开始前清除 */
+export function isTransientContinuationMessage(message: unknown): boolean {
+  return (
+    (message as { transientContinuation?: boolean } | undefined)?.transientContinuation === true
+  )
 }
 
 /**
@@ -192,7 +200,8 @@ export async function compactConversationForRetry(
   let pendingUser: AgentMessage | undefined
   let pendingIndex = -1
   for (let index = messages.length - 1; index >= 0; index--) {
-    if (messages[index]?.role === "user") {
+    // 跳过临时续写指令，保留真正的用户问题
+    if (messages[index]?.role === "user" && !isTransientContinuationMessage(messages[index])) {
       pendingUser = messages[index]
       pendingIndex = index
       break

@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test"
-import { MAX_TEXT_TOOLCALL_RETRIES } from "../../src/agent/context-recovery"
+import {
+  isTransientContinuationMessage,
+  MAX_TEXT_TOOLCALL_RETRIES,
+} from "../../src/agent/context-recovery"
 import {
   FALLBACK_RETRY_MS,
   isContextOverflowError,
@@ -900,7 +903,7 @@ test("截断末尾无正文时不自动续写", async () => {
 test("续写请求本身超限则压缩后重试", async () => {
   class TruncThenOverflowAgent extends StubAgent {
     override async prompt(_input: string): Promise<void> {
-      this.state.messages.push({ role: "user" })
+      this.state.messages.push({ role: "user", content: [{ type: "text", text: _input }] })
       this.state.messages.push({
         role: "assistant",
         stopReason: "length",
@@ -944,6 +947,28 @@ test("续写请求本身超限则压缩后重试", async () => {
   expect(debug).toContain("agent_length_continue")
   expect(debug).toContain("agent_context_trim")
   expect(agent.state.messages.at(-1)?.stopReason).toBe("stop")
+  // 压缩重试保留的是原始用户问题，不是临时续写指令
+  const lastUser = [...agent.state.messages].reverse().find((m) => m.role === "user")
+  expect(lastUser).toMatchObject({ content: [{ type: "text", text: "分析一下" }] })
+})
+
+test("临时续写指令在新一轮开始前被清除", async () => {
+  const agent = new StubAgent(null, 1)
+  const driver = new PiAgentDriver(
+    agent as never,
+    [{ model: { id: "m1" } as never, label: "openai/m1" }],
+    new Map(),
+    () => [],
+  )
+
+  await driver.run("分析一下", () => {})
+  expect(agent.state.messages.some((message) => isTransientContinuationMessage(message))).toBe(true)
+  await driver.run("继续分析", () => {})
+
+  expect(agent.state.messages.some((message) => isTransientContinuationMessage(message))).toBe(
+    false,
+  )
+  expect(agent.continued).toBe(1)
 })
 
 test("思考等级：设置、查看并随会话持久化", () => {

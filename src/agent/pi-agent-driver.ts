@@ -3,6 +3,7 @@ import { compactConversation, shouldProactiveCompact } from "./context-compactio
 import {
   appendedAssistantOutcomes,
   type ConversationSummarizer,
+  isTransientContinuationMessage,
   recoverInterruptedTurn,
   recoverTextToolCallTurn,
 } from "./context-recovery"
@@ -128,6 +129,10 @@ export class PiAgentDriver implements AgentDriver {
     this.#currentInput = input
     this.#chain.revertToPrimaryIfDue(this.#agent)
     this.#agent.setSystemPrompt(this.#composePrompt())
+    // 临时续写指令只在当轮有效：新一轮开始前清除残留
+    this.#agent.replaceMessages(
+      this.#agent.state.messages.filter((message) => !isTransientContinuationMessage(message)),
+    )
     await this.#compactProactively(emit)
     try {
       let base = this.#agent.state.messages.length
