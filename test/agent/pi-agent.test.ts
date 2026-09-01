@@ -267,6 +267,11 @@ test("识别上下文超限错误，排除额度与鉴权错误", () => {
   expect(isContextOverflowError("This model's maximum context length is 8192 tokens")).toBe(true)
   expect(isContextOverflowError("400 请求超过最大上下文长度")).toBe(true)
   expect(isContextOverflowError("too many tokens in request")).toBe(true)
+  expect(
+    isContextOverflowError(
+      "400 request (68323 tokens) exceeds the available context size (65536 tokens), try increasing it",
+    ),
+  ).toBe(true)
   expect(isContextOverflowError("429 insufficient_quota: You exceeded your current quota")).toBe(
     false,
   )

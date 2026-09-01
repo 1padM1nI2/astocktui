@@ -37,7 +37,7 @@ export function isQuotaExhaustedError(message: string): boolean {
 }
 
 const CONTEXT_OVERFLOW_PATTERN =
-  /context\s*(window|length|size)\s*(exceeds?|is\s*exceeded|overflow|too\s*long|limit)|maximum\s*context|too\s*many\s*tokens|上下文.*(超限|超出|过长)|超[出过].*上下文/iu
+  /context\s*(window|length|size)\s*(exceeds?|is\s*exceeded|overflow|too\s*long|limit)|maximum\s*context|too\s*many\s*tokens|exceeds? (?:the |an )?available context|上下文.*(超限|超出|过长)|超[出过].*上下文/iu
 
 export function isContextOverflowError(message: string): boolean {
   return CONTEXT_OVERFLOW_PATTERN.test(message)
