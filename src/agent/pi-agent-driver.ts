@@ -20,6 +20,7 @@ import {
   type ThinkingLevelName,
 } from "./thinking"
 import { summarizeToolResult } from "./tool-result-summary"
+import { installTurnBoundaryCompaction } from "./turn-compact"
 import { AgentUsageTracker } from "./usage-stats"
 
 export { authorizeAgentTool, SYSTEM_PROMPT }
@@ -61,6 +62,15 @@ export class PiAgentDriver implements AgentDriver {
         ? undefined
         : { block: true, reason: "用户未明确授权当前请求执行该模拟账户操作" }
     this.#agent.setSystemPrompt(this.#composePrompt())
+    // 长工具回合中途释放工具原文，避免单轮内累积超过模型窗口（400 超限）
+    installTurnBoundaryCompaction({
+      agent,
+      getModel: () => this.#chain.current?.model,
+      getSystemPrompt: () => this.#agent.state.systemPrompt,
+      getSummarizer: () => this.#contextSummarizer,
+      onDebug: this.#onDebug,
+      onEvent: (event) => this.#emit?.(event),
+    })
   }
 
   get modelLabel(): string {
@@ -174,7 +184,8 @@ export class PiAgentDriver implements AgentDriver {
    */
   async #compactProactively(emit: (event: AgentDriverEvent) => void): Promise<void> {
     const contextWindow = this.#chain.current?.model.contextWindow
-    if (!shouldProactiveCompact(this.#agent.state.messages, contextWindow)) return
+    const systemPrompt = this.#agent.state.systemPrompt
+    if (!shouldProactiveCompact(this.#agent.state.messages, contextWindow, systemPrompt)) return
     if (await compactConversation(this.#agent, this.#contextSummarizer, emit)) {
       this.#onDebug?.("agent_context_compact", { contextWindow })
     }

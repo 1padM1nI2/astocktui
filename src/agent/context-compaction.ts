@@ -2,34 +2,50 @@ import type { Agent, AgentMessage } from "@oh-my-pi/pi-agent-core"
 import type { ConversationSummarizer } from "./context-recovery"
 import type { AgentDriverEvent } from "./controller"
 import { usageFromMessage } from "./usage-stats"
+import { estimateMessagesTokens } from "./token-estimate"
 
-/** 主动压缩阈值：prompt token 达到窗口 × 0.85 即在下轮前压缩（对齐 Reasonix compact_ratio 默认） */
-export const PROACTIVE_COMPACT_RATIO = 0.85
+/** 主动压缩阈值：prompt token 达到窗口 × 0.70 即在下轮前压缩（预留 30% 缓冲吸收估算误差，宁早勿顶穿窗口） */
+export const PROACTIVE_COMPACT_RATIO = 0.7
 
 /**
- * 估算当前对话的 prompt token：优先最后一条 assistant 的真实 usage
- * （DeepSeek 返回 prompt_cache_hit/miss_tokens，input + cacheRead + cacheWrite 即上一轮 prompt 总量）；
- * 会话刚恢复等无 usage 场景按内容字符数粗估兜底。
+ * 估算当前对话的 prompt token：取"最后一条 assistant 的真实 usage"与
+ * "当前内容字符估算"（token-estimate，本地分词器校准 0.6/字符）的较大者。
+ * - usage 最准，但只反映上一次模型调用，比当前上下文滞后一个回合
+ *   （09-03 10:45 400：usage 51,656 < 阈值 55,705，实际上下文 85,779）；
+ * - 零 usage（如纯思考 stop 响应）按缺失处理并继续向前找，
+ *   否则估算被钉死在 0（09-03 11:15 400）。
  */
-export function estimatePromptTokens(messages: readonly AgentMessage[]): number {
+export function estimatePromptTokens(
+  messages: readonly AgentMessage[],
+  systemPrompt?: readonly string[],
+): number {
+  let usageEstimate = 0
+  let hasUsage = false
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index]
     if (message === undefined) continue
     const usage = usageFromMessage(message)
-    if (usage !== undefined) return usage.input + usage.cacheRead + usage.cacheWrite
+    if (usage === undefined) continue
+    const total = usage.input + usage.cacheRead + usage.cacheWrite
+    if (total <= 0) continue
+    usageEstimate = total
+    hasUsage = true
+    break
   }
-  let chars = 0
-  for (const message of messages) chars += JSON.stringify(message).length
-  return Math.ceil(chars / 2)
+  return Math.max(hasUsage ? usageEstimate : 0, estimateMessagesTokens(messages, systemPrompt))
 }
 
 /** 是否应在下一轮前主动压缩；窗口未知时不触发，保留超限重试兜底 */
 export function shouldProactiveCompact(
   messages: readonly AgentMessage[],
   contextWindow: number | null | undefined,
+  systemPrompt?: readonly string[],
 ): boolean {
   if (contextWindow === null || contextWindow === undefined || contextWindow <= 0) return false
-  return estimatePromptTokens(messages) >= Math.floor(contextWindow * PROACTIVE_COMPACT_RATIO)
+  return (
+    estimatePromptTokens(messages, systemPrompt) >=
+    Math.floor(contextWindow * PROACTIVE_COMPACT_RATIO)
+  )
 }
 
 /** 较早对话摘要包装为一条 user 消息；role 取 user 是为了让模型把它当背景资料而不是自己的话 */

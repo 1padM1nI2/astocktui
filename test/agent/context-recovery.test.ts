@@ -47,13 +47,47 @@ describe("prompt token 估算", () => {
   test("空对话为 0", () => {
     expect(estimatePromptTokens([])).toBe(0)
   })
+
+  test("零 usage 按缺失处理，不把估算钉死在 0（09-03 11:15 400 回归）", () => {
+    const zeroUsage = msg({
+      role: "assistant",
+      stopReason: "stop",
+      content: [{ type: "thinking", thinking: "思考" }],
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+    })
+    const tokens = estimatePromptTokens([
+      msg({ role: "user", content: "盘".repeat(95_000), timestamp: 1 }),
+      zeroUsage,
+    ])
+    expect(tokens).toBeGreaterThan(55_705)
+  })
+
+  test("usage 滞后于当前上下文时取较大者（09-03 10:45 400 回归）", () => {
+    const tokens = estimatePromptTokens([
+      assistantWithUsage(50_000),
+      msg({ role: "user", content: "盘".repeat(95_000), timestamp: 1 }),
+    ])
+    expect(tokens).toBeGreaterThan(50_000)
+  })
 })
 
 describe("主动压缩触发判断", () => {
-  test("达到窗口 85% 触发，未达不触发", () => {
+  test("达到窗口 70% 触发，未达不触发", () => {
     const messages = [assistantWithUsage(8000, 1000)]
-    expect(shouldProactiveCompact(messages, 10_000)).toBe(true)
-    expect(shouldProactiveCompact(messages, 12_000)).toBe(false)
+    expect(shouldProactiveCompact(messages, 11_000)).toBe(true)
+    expect(shouldProactiveCompact(messages, 14_000)).toBe(false)
+  })
+
+  test("CJK 密集内容达真实窗口 70% 触发（chars/2 会漏判）", () => {
+    const messages = [msg({ role: "user", content: "盘".repeat(95_000), timestamp: 1 })]
+    expect(shouldProactiveCompact(messages, 65_536)).toBe(true)
   })
 
   test("上下文窗口未知时不触发", () => {

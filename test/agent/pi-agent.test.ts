@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import {
   isTransientContinuationMessage,
   MAX_TEXT_TOOLCALL_RETRIES,
@@ -352,6 +352,22 @@ class StubAgent {
   }
   replaceMessages(messages: StubMessage[]): void {
     this.state.messages = messages
+  }
+  turnEndFn:
+    | ((
+        messages: StubMessage[],
+        signal?: AbortSignal,
+        context?: { willContinue: boolean },
+      ) => Promise<void> | void)
+    | undefined
+  setOnTurnEnd(
+    fn: (
+      messages: StubMessage[],
+      signal?: AbortSignal,
+      context?: { willContinue: boolean },
+    ) => Promise<void> | void,
+  ): void {
+    this.turnEndFn = fn
   }
   setModel(model: unknown): void {
     this.model = model
@@ -1167,4 +1183,57 @@ test("上下文未达阈值时不主动压缩", async () => {
   await driver.run("继续", () => {})
   expect(debug).not.toContain("agent_context_compact")
   expect(agent.state.messages[0]).toMatchObject({ role: "user", content: "问题" })
+})
+describe("回合边界压缩接线", () => {
+  test("onTurnEnd 钩子注册且仅在 willContinue 且超阈值时原地压缩", async () => {
+    const agent = new StubAgent(null)
+    const driver = new PiAgentDriver(
+      agent as never,
+      [{ model: { id: "m1", contextWindow: 65_536 } as never, label: "openai/m1" }],
+      new Map(),
+      () => [],
+      undefined,
+      undefined,
+      undefined,
+      async () => "摘要：已查询行情",
+    )
+    expect(driver).toBeDefined()
+    const hook = agent.turnEndFn
+    expect(hook).toBeDefined()
+    if (hook === undefined) throw new Error("onTurnEnd 钩子未注册")
+
+    const user = { role: "user", content: "分析今天行情" }
+    const assistant = { role: "assistant", stopReason: "stop", content: [] }
+    const tool = {
+      role: "tool",
+      toolCallId: "c1",
+      content: [{ type: "text", text: "z".repeat(118_000) }],
+    }
+    const live: StubMessage[] = [user, assistant, tool]
+    // 未继续的回合边界（最终收尾）不压缩
+    await hook(live, undefined, { willContinue: false })
+    expect(live).toHaveLength(3)
+    // 继续的回合边界且估算超窗口 85%：原地替换为 [摘要, 用户消息]
+    await hook(live, undefined, { willContinue: true })
+    expect(live).toHaveLength(2)
+    expect(live[1]).toEqual(user)
+    expect(JSON.stringify(live[0])).toContain("摘要：已查询行情")
+  })
+
+  test("无摘要器时回合边界压缩静默跳过", async () => {
+    const agent = new StubAgent(null)
+    const driver = new PiAgentDriver(
+      agent as never,
+      [{ model: { id: "m1", contextWindow: 65_536 } as never, label: "openai/m1" }],
+      new Map(),
+      () => [],
+    )
+    expect(driver).toBeDefined()
+    const hook2 = agent.turnEndFn
+    expect(hook2).toBeDefined()
+    if (hook2 === undefined) throw new Error("onTurnEnd 钩子未注册")
+    const live: StubMessage[] = [{ role: "user", content: "a".repeat(200_000) }]
+    await hook2(live, undefined, { willContinue: true })
+    expect(live).toHaveLength(1)
+  })
 })
